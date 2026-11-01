@@ -1,0 +1,64 @@
+connector: clickhouse
+version: 1
+adapter_version: "1.0"
+tools:
+  - name: run_query
+    description: >-
+      Execute SQL queries in ClickHouse. Queries run in read-only mode. Bind optional params by name with
+      {name:Type} placeholders, such as {name:String} or {vector:Array(Float32)}. Values may be JSON scalars,
+      nulls, or arrays. Pass exact large integers as decimal strings. Use DESCRIBE (<query>) when you need a
+      query's output columns and types. Consider EXPLAIN ESTIMATE <query> before a SELECT that could be expensive.
+      A query of the form "@group.name" runs that named query with the given params.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        query: { type: string }
+        params:
+          anyOf: [{ type: object, additionalProperties: true }, { type: "null" }]
+          default: null
+      required: [query]
+  - name: list_databases
+    description: List available ClickHouse databases.
+    inputSchema: { type: object, additionalProperties: false, properties: {} }
+  - name: list_tables
+    description: >-
+      List available ClickHouse tables in a database, including schema, comment, row count, and column count.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        database: { type: string, description: The database to list tables from }
+        like: { anyOf: [{ type: string }, { type: "null" }], default: null, description: Optional LIKE pattern to filter table names }
+        not_like: { anyOf: [{ type: string }, { type: "null" }], default: null, description: Optional NOT LIKE pattern to exclude table names }
+        include_detailed_columns: { type: boolean, default: true }
+        page_size: { type: integer, default: 50, exclusiveMinimum: 0 }
+        page_token: { anyOf: [{ type: string }, { type: "null" }], default: null }
+      required: [database]
+operations:
+  - id: clickhouse.named_query
+    tool: run_query
+    match: { query: "^@[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$" }
+    risk: read
+    constraints: [queries, max_rows, max_execution_seconds, calls_per_run]
+    compact: { rows_preview: 20 }
+    description: Run a named, parameterised, read-only query the grant lists.
+  - id: clickhouse.sql.select
+    tool: run_query
+    risk: read
+    requires_capability: sql.select
+    constraints: [max_rows, max_execution_seconds, calls_per_run]
+    guards: [single_statement, select_only]
+    compact: { rows_preview: 20 }
+    description: Run an ad-hoc read-only statement (SELECT, WITH, SHOW, DESCRIBE, EXPLAIN, EXISTS).
+  - id: clickhouse.schema.databases
+    tool: list_databases
+    risk: read
+    requires_capability: sql.select
+    constraints: [calls_per_run]
+  - id: clickhouse.schema.tables
+    tool: list_tables
+    risk: read
+    requires_capability: sql.select
+    constraints: [calls_per_run]
+    compact: { rows_preview: 50 }

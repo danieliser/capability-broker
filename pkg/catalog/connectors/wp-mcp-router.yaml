@@ -1,0 +1,43 @@
+connector: wp-mcp-router
+version: 1
+adapter_version: "1.0"
+tools_from_upstream: true
+tools_allow: [wp_list_sites, wp_search_abilities, wp_get_ability, wp_run, wp_get_content_by_url]
+operations:
+  # Specific wp_run operations first: the ability name selects the operation.
+  - id: wordpress.content.read
+    tool: wp_run
+    match: { ability_name: "^(core/(get-post|list-posts|get-site-info|list-post-types|get-taxonomy|list-terms|get-term|get-media|list-media|get-user|list-users)|[a-z0-9-]+/(get|list|search|find|read|render|analyze|preview|check)-[a-z0-9-]+)$" }
+    risk: read
+    requires_capability: operations:content.read
+    constraints: [sites, calls_per_run]
+    compact: { fields: [id, status, type, title, link, modified, date, slug] }
+  - id: wordpress.content.draft
+    tool: wp_run
+    match: { ability_name: "^(core/(create-post|update-post)|[a-z0-9-]+/(create|update)-(post|page|guide|draft)[a-z0-9-]*)$" }
+    risk: reversible
+    requires_capability: operations:content.draft
+    constraints: [sites, post_types, max_drafts_per_run, calls_per_run]
+    guards: [force_draft_status]
+    compact: { fields: [id, status, type, title, link, modified, slug] }
+  - id: wordpress.site.read
+    tool: wp_list_sites
+    risk: read
+    requires_capability: operations:content.read
+    constraints: [sites_filter, calls_per_run]
+  - id: wordpress.abilities.search
+    tool: wp_search_abilities
+    risk: read
+    requires_capability: operations:content.read
+    constraints: [sites_filter, calls_per_run]
+  - id: wordpress.abilities.describe
+    tool: wp_get_ability
+    risk: read
+    requires_capability: operations:content.read
+    constraints: [sites, calls_per_run]
+  - id: wordpress.content.read_url
+    tool: wp_get_content_by_url
+    risk: read
+    requires_capability: operations:content.read
+    constraints: [sites_url, calls_per_run]
+    compact: { fields: [id, status, type, title, link, modified, date, slug, site] }

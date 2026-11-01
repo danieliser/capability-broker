@@ -1,0 +1,69 @@
+connector: memory
+version: 1
+adapter_version: "1.0"
+tools:
+  - name: store_memory
+    description: >-
+      Store a memory in AutoMem. Target 150-300 characters; max 2000. Format: "Brief title. Context and
+      details. Impact/outcome." Tags scope the memory; the broker adds the grant's namespace tags.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        content: { type: string, description: The memory content. Be specific. }
+        tags: { type: array, items: { type: string } }
+        importance: { type: number, minimum: 0, maximum: 1 }
+        type: { type: string, enum: [Decision, Pattern, Preference, Style, Habit, Insight, Context] }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        metadata: { type: object }
+      required: [content]
+  - name: recall_memory
+    description: >-
+      Recall memories from AutoMem: hybrid search across vector, keyword, tags and recency, restricted to the
+      grant's namespace. Pass query (natural language) and optionally tags, limit, time_query.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        query: { type: string }
+        queries: { type: array, items: { type: string } }
+        tags: { type: array, items: { type: string } }
+        limit: { type: integer, minimum: 1, maximum: 50, default: 5 }
+        time_query: { type: string }
+        tag_mode: { type: string, enum: [any, all] }
+  - name: associate_memories
+    description: Create a typed relationship between two memories in the grant's namespace.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        memory1_id: { type: string }
+        memory2_id: { type: string }
+        type: { type: string, enum: [RELATES_TO, LEADS_TO, OCCURRED_BEFORE, PREFERS_OVER, EXEMPLIFIES, CONTRADICTS, REINFORCES, INVALIDATED_BY, EVOLVED_INTO, DERIVED_FROM, PART_OF] }
+        strength: { type: number, minimum: 0, maximum: 1 }
+      required: [memory1_id, memory2_id, type, strength]
+  - name: check_database_health
+    description: Check AutoMem service health.
+    inputSchema: { type: object, additionalProperties: false, properties: {} }
+operations:
+  - id: memory.store
+    tool: store_memory
+    risk: reversible
+    requires_capability: operations:store
+    constraints: [namespaces, store_per_run, max_importance, calls_per_run]
+    compact: { fields: [memory_id] }
+  - id: memory.recall
+    tool: recall_memory
+    risk: read
+    requires_capability: operations:recall
+    constraints: [namespaces, calls_per_run]
+    compact: { preview_chars: 200 }
+  - id: memory.associate
+    tool: associate_memories
+    risk: reversible
+    requires_capability: operations:store
+    constraints: [namespaces, calls_per_run]
+  - id: memory.health
+    tool: check_database_health
+    risk: read
+    constraints: [calls_per_run]

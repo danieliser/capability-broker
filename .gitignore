@@ -1,0 +1,5 @@
+/brokerd
+/brokerd-probe
+*.db
+*.log
+/output/
