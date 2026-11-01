@@ -4,6 +4,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-01
+
 - Hot reload of `connectors.yaml`, `secrets.json` and `catalog.d` (2s poll, `SIGHUP`, `brokerd reload` / `POST /v1/reload`); live sessions receive `tools/list_changed`. A connector added while a Claude Code session is running is usable in that session, verified in sessionless and session modes.
 - `/mcp` aggregate endpoint (`<connector>__<tool>`, `?exclude=`); every server advertises `tools{listChanged}` even when empty.
 - `brokerd client install <claude-code|codex|cursor|opencode|all>` with per-client owner tokens, per-connector entries plus one `broker` aggregate entry, backups under `~/.brokerd/clients`, lossless `--revert`; Codex `config.toml` is edited table by table.
