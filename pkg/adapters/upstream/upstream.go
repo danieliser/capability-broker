@@ -399,7 +399,7 @@ func upstreamID(payload any) string {
 // text content parsed as JSON, then the joined text.
 func payloadOf(res *mcp.CallToolResult) any {
 	if res.StructuredContent != nil {
-		return res.StructuredContent
+		return decodeNested(res.StructuredContent, 0)
 	}
 	var texts []string
 	for _, c := range res.Content {
@@ -410,9 +410,39 @@ func payloadOf(res *mcp.CallToolResult) any {
 	joined := strings.Join(texts, "\n")
 	var parsed any
 	if err := json.Unmarshal([]byte(joined), &parsed); err == nil {
-		return parsed
+		return decodeNested(parsed, 0)
 	}
 	return joined
+}
+
+// decodeNested opens string values that are themselves JSON objects or arrays (servers that wrap a
+// JSON document in {"result": "<json>"}), so trimming and field picking see the structure.
+func decodeNested(v any, depth int) any {
+	if depth > 2 {
+		return v
+	}
+	switch t := v.(type) {
+	case string:
+		trimmed := strings.TrimSpace(t)
+		if len(trimmed) > 1 && (trimmed[0] == '{' || trimmed[0] == '[') {
+			var inner any
+			if err := json.Unmarshal([]byte(trimmed), &inner); err == nil {
+				return decodeNested(inner, depth+1)
+			}
+		}
+		return t
+	case map[string]any:
+		for k, x := range t {
+			t[k] = decodeNested(x, depth+1)
+		}
+		return t
+	case []any:
+		for i, x := range t {
+			t[i] = decodeNested(x, depth+1)
+		}
+		return t
+	}
+	return v
 }
 
 // shape applies the operation's compact spec: explicit fields when declared,
