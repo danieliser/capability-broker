@@ -114,6 +114,9 @@ func run(cfg config.Config, stateless bool) error {
 	front := &mcpfront.Front{Store: store, Catalog: cat, Audit: writer, Registry: reg, Logger: logger, SessionTimeout: 30 * time.Minute, Stateless: stateless}
 	pinMgr := &pins.Manager{DataDir: cfg.DataDir, TTL: pinTTL, Log: func(msg string, kv ...any) { logger.Info(msg, kv...) }}
 	reloader := &reload.Reloader{Config: cfg, Catalog: cat, Registry: reg, Front: front, Base: ctx, Pins: pinMgr,
+		OnConnectorsChanged: func(names []string) {
+			syncManagedClients(cfg, names, func(msg string, kv ...any) { logger.Info(msg, kv...) })
+		},
 		Log: func(msg string, kv ...any) { logger.Info(msg, kv...) }}
 	if res, err := reloader.Apply(ctx); err != nil {
 		return fmt.Errorf("initial load: %w", err)

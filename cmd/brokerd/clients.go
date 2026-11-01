@@ -138,8 +138,10 @@ func runClientInstall(ctx context.Context, args []string) int {
 		}
 		stamp := time.Now().Format("20060102T150405")
 		_ = os.WriteFile(path+".pre-broker-"+stamp, orig, 0o600)
+		managed := filepath.Join(cfg.DataDir, "clients", c.name+".managed")
 		if *revert {
 			_ = os.Remove(backupPath)
+			_ = os.Remove(managed)
 			fmt.Printf("%-12s restored (%d entries) in %s\n", c.name, len(saved), path)
 			continue
 		}
@@ -151,6 +153,8 @@ func runClientInstall(ctx context.Context, args []string) int {
 		raw, _ := json.MarshalIndent(saved, "", "  ")
 		_ = os.MkdirAll(filepath.Dir(backupPath), 0o700)
 		_ = os.WriteFile(backupPath, raw, 0o600)
+		// Managed: the daemon keeps this client's entries in step with the connectors it runs.
+		_ = os.WriteFile(managed, []byte("1\n"), 0o600)
 		names := make([]string, 0, len(entries))
 		for _, e := range entries {
 			names = append(names, e.Name)
@@ -189,6 +193,7 @@ func clientToken(ctx context.Context, cfg config.Config, name string) (string, e
 // stripped (the file is rewritten as JSON). Returns the entries it replaced.
 func applyJSONServers(key string, render func(entry) any) func(string, []entry, map[string]json.RawMessage) (map[string]json.RawMessage, error) {
 	return func(path string, entries []entry, revert map[string]json.RawMessage) (map[string]json.RawMessage, error) {
+		before, _ := os.Stat(path)
 		raw, err := os.ReadFile(path)
 		if err != nil {
 			return nil, err
@@ -219,6 +224,15 @@ func applyJSONServers(key string, render func(entry) any) func(string, []entry, 
 				servers[name] = v
 			}
 		} else {
+			want := map[string]bool{}
+			for _, e := range entries {
+				want[e.Name] = true
+			}
+			for name, cur := range servers { // a connector the broker no longer runs
+				if isBrokerEntry(cur) && !want[name] {
+					delete(servers, name)
+				}
+			}
 			for _, e := range entries {
 				if cur, ok := servers[e.Name]; ok && !isBrokerEntry(cur) {
 					b, _ := json.Marshal(cur)
@@ -233,6 +247,16 @@ func applyJSONServers(key string, render func(entry) any) func(string, []entry, 
 		out, err := json.MarshalIndent(doc, "", "  ")
 		if err != nil {
 			return nil, err
+		}
+		var orig map[string]any
+		_ = json.Unmarshal([]byte(text), &orig)
+		if a, b := mustJSON(orig), mustJSON(doc); a == b {
+			return backup, nil // nothing to change: do not touch a file the client itself writes to
+		}
+		// Clients write their own config (Claude Code keeps session state in ~/.claude.json). If the file moved
+		// under us, start over rather than overwrite their change.
+		if after, err := os.Stat(path); err == nil && before != nil && !after.ModTime().Equal(before.ModTime()) {
+			return nil, fmt.Errorf("%s changed while being edited; try again", path)
 		}
 		return backup, atomicWrite(path, out)
 	}
@@ -266,6 +290,9 @@ func applyCodex(path string, entries []entry, revert map[string]json.RawMessage)
 	var kept []string
 	removed := map[string]string{}
 	for _, b := range blocks {
+		if name := codexServer(b.header); name != "" && revert == nil && !names[name] && strings.Contains(b.text, "url = \"http://127.0.0.1:") && strings.Contains(b.text, "/mcp") {
+			continue // a connector the broker no longer runs
+		}
 		if name := codexServer(b.header); name != "" && names[name] {
 			removed[name] += b.text
 			continue
@@ -293,6 +320,9 @@ func applyCodex(path string, entries []entry, revert map[string]json.RawMessage)
 		}
 	}
 	out := strings.TrimRight(strings.Join(kept, ""), "\n") + "\n\n" + add.String()
+	if strings.TrimSpace(out) == strings.TrimSpace(string(raw)) {
+		return backup, nil
+	}
 	return backup, atomicWrite(path, []byte(out))
 }
 
@@ -334,4 +364,64 @@ func atomicWrite(path string, data []byte) error {
 		return err
 	}
 	return os.Rename(tmp, path)
+}
+
+func mustJSON(v any) string {
+	b, _ := json.Marshal(v)
+	return string(b)
+}
+
+// syncManagedClients is called by the daemon when the set of connectors changes. Every client installed with
+// `brokerd client install` gets one entry per connector (tool names exactly as the upstream server's), and its
+// broker entry excludes them all. A chat already open keeps reaching a new connector through `broker`; the next
+// chat sees it as its own server.
+func syncManagedClients(cfg config.Config, connectors []string, log func(msg string, kv ...any)) {
+	home, _ := os.UserHomeDir()
+	sort.Strings(connectors)
+	for _, c := range clients {
+		dir := filepath.Join(cfg.DataDir, "clients")
+		if _, err := os.Stat(filepath.Join(dir, c.name+".managed")); err != nil {
+			continue
+		}
+		raw, err := os.ReadFile(filepath.Join(dir, c.name+".token"))
+		if err != nil {
+			continue
+		}
+		token := strings.TrimSpace(string(raw))
+		path := c.path(home)
+		if _, err := os.Stat(path); err != nil {
+			continue
+		}
+		base := "http://" + cfg.FrontAddr()
+		var entries []entry
+		for _, name := range connectors {
+			entries = append(entries, entry{Name: name, URL: base + "/mcp/" + name, Token: token})
+		}
+		entries = append(entries, entry{Name: "broker", URL: base + "/mcp?exclude=" + strings.Join(connectors, ","), Token: token})
+		var backup map[string]json.RawMessage
+		for attempt := 0; attempt < 3; attempt++ {
+			if backup, err = c.apply(path, entries, nil); err == nil {
+				break
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
+		if err != nil {
+			log("client sync failed", "client", c.name, "err", err.Error())
+			continue
+		}
+		backupPath := filepath.Join(dir, c.name+".backup.json")
+		saved := map[string]json.RawMessage{}
+		if b, err := os.ReadFile(backupPath); err == nil {
+			_ = json.Unmarshal(b, &saved)
+		}
+		for k, v := range backup {
+			if _, have := saved[k]; !have {
+				saved[k] = v
+			}
+		}
+		if b, err := json.MarshalIndent(saved, "", "  "); err == nil {
+			_ = os.WriteFile(backupPath, b, 0o600)
+		}
+		log("client synced", "client", c.name, "connectors", connectors)
+	}
 }

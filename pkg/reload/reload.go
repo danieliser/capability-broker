@@ -38,6 +38,8 @@ type Reloader struct {
 	// Base outlives any single Apply call (an admin request's context ends with its response); children
 	// start and run under it.
 	Base context.Context
+	// OnConnectorsChanged runs after a reconcile that added or removed connectors, with the current names.
+	OnConnectorsChanged func(names []string)
 	// Pins swaps npx/uvx commands for pinned installs; nil disables pinning.
 	Pins *pins.Manager
 
@@ -139,6 +141,9 @@ func (r *Reloader) Apply(ctx context.Context) (Result, error) {
 	sort.Strings(res.Removed)
 	r.Front.Refresh(ctx)
 	res.Policy = r.Catalog.PolicyVersion()
+	if len(res.Added)+len(res.Removed) > 0 && r.OnConnectorsChanged != nil {
+		go r.OnConnectorsChanged(r.Registry.Names())
+	}
 	if len(res.Added)+len(res.Restarted)+len(res.Removed) > 0 {
 		r.log("connectors reconciled", "added", res.Added, "restarted", res.Restarted, "removed", res.Removed, "policy_version", res.Policy)
 	}
