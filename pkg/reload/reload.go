@@ -23,6 +23,7 @@ import (
 	"github.com/danieliser/capability-broker/pkg/config"
 	"github.com/danieliser/capability-broker/pkg/connectors"
 	"github.com/danieliser/capability-broker/pkg/mcpfront"
+	"github.com/danieliser/capability-broker/pkg/pins"
 	"github.com/danieliser/capability-broker/pkg/registry"
 )
 
@@ -37,6 +38,8 @@ type Reloader struct {
 	// Base outlives any single Apply call (an admin request's context ends with its response); children
 	// start and run under it.
 	Base context.Context
+	// Pins swaps npx/uvx commands for pinned installs; nil disables pinning.
+	Pins *pins.Manager
 
 	mu        sync.Mutex
 	digests   map[string]string // connector → spec digest
@@ -74,6 +77,17 @@ func (r *Reloader) Apply(ctx context.Context) (Result, error) {
 	specs, err := connectors.Load(cfg.ConnectorsPath(), cfg.Secrets)
 	if err != nil {
 		return res, err
+	}
+	if r.Pins != nil {
+		r.Pins.Apply(specs)
+		// Resolve and install missing or stale pins in the background; pins.json changing triggers the next
+		// reconcile, which restarts those connectors on the pinned copy.
+		raw, _ := connectors.Load(cfg.ConnectorsPath(), cfg.Secrets)
+		base := r.Base
+		if base == nil {
+			base = context.Background()
+		}
+		go r.Pins.Check(base, raw)
 	}
 	if err := r.Catalog.Reload(); err != nil {
 		return res, fmt.Errorf("catalog: %w", err)
@@ -184,7 +198,7 @@ func (r *Reloader) Watch(ctx context.Context, every time.Duration) {
 
 // fingerprint is the size and mtime of every watched file; contents are hashed only by Apply.
 func (r *Reloader) fingerprint() string {
-	paths := []string{r.Config.ConnectorsPath(), r.Config.SecretsPath()}
+	paths := []string{r.Config.ConnectorsPath(), r.Config.SecretsPath(), filepath.Join(r.Config.DataDir, pins.Filename)}
 	matches, _ := filepath.Glob(filepath.Join(r.Config.CatalogDir(), "*.yaml"))
 	sort.Strings(matches)
 	paths = append(paths, matches...)

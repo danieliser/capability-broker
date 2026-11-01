@@ -26,8 +26,10 @@ import (
 	"github.com/danieliser/capability-broker/pkg/buildinfo"
 	"github.com/danieliser/capability-broker/pkg/catalog"
 	"github.com/danieliser/capability-broker/pkg/config"
+	"github.com/danieliser/capability-broker/pkg/connectors"
 	"github.com/danieliser/capability-broker/pkg/durable"
 	"github.com/danieliser/capability-broker/pkg/mcpfront"
+	"github.com/danieliser/capability-broker/pkg/pins"
 	"github.com/danieliser/capability-broker/pkg/registry"
 	"github.com/danieliser/capability-broker/pkg/reload"
 )
@@ -46,6 +48,7 @@ func main() {
 	flag.StringVar(&cfg.Host, "host", cfg.Host, "Front bind address (loopback only)")
 	flag.IntVar(&cfg.Port, "port", cfg.Port, "Front port")
 	flag.StringVar(&cfg.DataDir, "data-dir", cfg.DataDir, "Data root (database, admin socket, admin token, secrets, connectors.yaml, catalog.d)")
+	pinTTLFlag := flag.Duration("pin-ttl", 24*time.Hour, "How long a pinned npx/uvx version is kept before checking for a newer one")
 	stateless := flag.Bool("stateless", true, "Serve sessionless Streamable HTTP (MCP 2026-07-28); --stateless=false keeps Mcp-Session-Id sessions, which sampling and elicitation relay need")
 	flag.Parse()
 
@@ -68,6 +71,7 @@ func main() {
 	if ip := net.ParseIP(cfg.Host); ip == nil || !ip.IsLoopback() {
 		log.Fatalf("front host must be a loopback address, got %q", cfg.Host)
 	}
+	pinTTL = *pinTTLFlag
 	if err := run(cfg, *stateless); err != nil {
 		log.Fatalf("brokerd: %v", err)
 	}
@@ -108,7 +112,8 @@ func run(cfg config.Config, stateless bool) error {
 	writer := audit.NewWriter(db)
 	reg := registry.New()
 	front := &mcpfront.Front{Store: store, Catalog: cat, Audit: writer, Registry: reg, Logger: logger, SessionTimeout: 30 * time.Minute, Stateless: stateless}
-	reloader := &reload.Reloader{Config: cfg, Catalog: cat, Registry: reg, Front: front, Base: ctx,
+	pinMgr := &pins.Manager{DataDir: cfg.DataDir, TTL: pinTTL, Log: func(msg string, kv ...any) { logger.Info(msg, kv...) }}
+	reloader := &reload.Reloader{Config: cfg, Catalog: cat, Registry: reg, Front: front, Base: ctx, Pins: pinMgr,
 		Log: func(msg string, kv ...any) { logger.Info(msg, kv...) }}
 	if res, err := reloader.Apply(ctx); err != nil {
 		return fmt.Errorf("initial load: %w", err)
@@ -118,6 +123,21 @@ func run(cfg config.Config, stateless bool) error {
 	defer closeAll(reg, 1500*time.Millisecond)
 	// Hot reload: poll the data-root files, and apply on SIGHUP too.
 	go reloader.Watch(ctx, 2*time.Second)
+	// Pins past their TTL are rechecked hourly; a newer version installs beside the old one and swaps in.
+	go func() {
+		t := time.NewTicker(time.Hour)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				if raw, err := connectors.Load(cfg.ConnectorsPath(), reloaderSecrets(cfg)); err == nil {
+					pinMgr.Check(ctx, raw)
+				}
+			}
+		}
+	}()
 	hup := make(chan os.Signal, 1)
 	signal.Notify(hup, syscall.SIGHUP)
 	go func() {
@@ -200,4 +220,13 @@ func closeAll(reg *registry.Registry, limit time.Duration) {
 	case <-done:
 	case <-time.After(limit):
 	}
+}
+
+var pinTTL = 24 * time.Hour
+
+// reloaderSecrets re-reads secrets.json for the hourly pin check.
+func reloaderSecrets(cfg config.Config) map[string]string {
+	cfg.Secrets = map[string]string{}
+	_ = cfg.LoadSecrets()
+	return cfg.Secrets
 }

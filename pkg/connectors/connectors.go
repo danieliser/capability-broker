@@ -32,6 +32,11 @@ type Spec struct {
 	Catalog string `yaml:"catalog,omitempty"`
 	// Disabled connectors stay in the file but are not started.
 	Disabled bool `yaml:"disabled,omitempty"`
+	// NoPin (`pin: false`) runs an npx/uvx command as written instead of a pinned local install.
+	NoPin bool  `yaml:"-"`
+	Pin   *bool `yaml:"pin,omitempty"`
+	// PinnedVersion is set when the command was swapped for a pinned install (package@version).
+	PinnedVersion string `yaml:"-"`
 }
 
 type File struct {
@@ -71,6 +76,7 @@ func Load(path string, secrets map[string]string) ([]*Spec, error) {
 			return nil, fmt.Errorf("%s: connector %s needs a command", path, name)
 		}
 		spec.Name = name
+		spec.NoPin = spec.Pin != nil && !*spec.Pin
 		spec.Command = expandHome(spec.Command)
 		if spec.Cwd != "" {
 			spec.Cwd = expandHome(spec.Cwd)
