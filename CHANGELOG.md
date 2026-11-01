@@ -4,8 +4,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-11-01
-
 Phase 1 of the capability broker (design: `docs/design.md`).
 
 - `brokerd` daemon: loopback Streamable HTTP MCP endpoint per connector (`/mcp/clickhouse`, `/mcp/wp-mcp-router`,
