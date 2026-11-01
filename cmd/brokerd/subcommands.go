@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/danieliser/capability-broker/pkg/api"
@@ -107,7 +106,7 @@ func runClient(ctx context.Context, args []string) int {
 		}
 		return 0
 	case "install":
-		return runClientInstall(args[1:])
+		return runClientInstall(ctx, args[1:])
 	}
 	return fail("unknown client subcommand %s", args[0])
 }
@@ -219,91 +218,5 @@ func runReceipts(ctx context.Context, args []string) int {
 		return fail("%v", err)
 	}
 	printJSON(out)
-	return 0
-}
-
-// runClientInstall rewrites the named connectors in ~/.claude.json to point at the broker,
-// keeping the original entries under a backup key so --revert can restore them.
-func runClientInstall(args []string) int {
-	fs := flag.NewFlagSet("client install", flag.ContinueOnError)
-	configPath := fs.String("config", filepath.Join(os.Getenv("HOME"), ".claude.json"), "Claude Code user config")
-	connectors := fs.String("connectors", "clickhouse,memory,wp-mcp-router", "connectors to route through the broker")
-	revert := fs.Bool("revert", false, "restore the backed-up entries")
-	if err := fs.Parse(args); err != nil || fs.NArg() != 1 || fs.Arg(0) != "claude-code" {
-		return fail("usage: brokerd client install claude-code [--config ~/.claude.json] [--connectors a,b] [--revert]  (codex: see `brokerd client install --help` output for the TOML)")
-	}
-	cfg := config.FromEnv()
-	tokenPath := filepath.Join(cfg.DataDir, "clients", "claude-code.token")
-	rawTok, err := os.ReadFile(tokenPath)
-	if err != nil {
-		return fail("no client token at %s; run `brokerd client mint --name claude-code` first", tokenPath)
-	}
-	token := strings.TrimSpace(string(rawTok))
-	raw, err := os.ReadFile(*configPath)
-	if err != nil {
-		return fail("%v", err)
-	}
-	var doc map[string]any
-	if err := json.Unmarshal(raw, &doc); err != nil {
-		return fail("parse %s: %v", *configPath, err)
-	}
-	servers, _ := doc["mcpServers"].(map[string]any)
-	if servers == nil {
-		return fail("%s has no mcpServers", *configPath)
-	}
-	backup, _ := doc["mcpServersBrokerBackup"].(map[string]any)
-	if backup == nil {
-		backup = map[string]any{}
-	}
-	changed := []string{}
-	for _, name := range strings.Split(*connectors, ",") {
-		name = strings.TrimSpace(name)
-		if name == "" {
-			continue
-		}
-		if *revert {
-			if orig, ok := backup[name]; ok {
-				servers[name] = orig
-				delete(backup, name)
-				changed = append(changed, name)
-			}
-			continue
-		}
-		if cur, ok := servers[name]; ok {
-			if _, already := backup[name]; !already {
-				backup[name] = cur
-			}
-		}
-		servers[name] = map[string]any{
-			"type":    "http",
-			"url":     "http://" + cfg.FrontAddr() + "/mcp/" + name,
-			"headers": map[string]any{"Authorization": "Bearer " + token},
-		}
-		changed = append(changed, name)
-	}
-	doc["mcpServersBrokerBackup"] = backup
-	if len(backup) == 0 {
-		delete(doc, "mcpServersBrokerBackup")
-	}
-	out, err := json.MarshalIndent(doc, "", "  ")
-	if err != nil {
-		return fail("%v", err)
-	}
-	stamp := time.Now().Format("20060102T150405")
-	if err := os.WriteFile(*configPath+".pre-broker-"+stamp, raw, 0o600); err != nil {
-		return fail("backup: %v", err)
-	}
-	tmp := *configPath + ".tmp"
-	if err := os.WriteFile(tmp, out, 0o600); err != nil {
-		return fail("%v", err)
-	}
-	if err := os.Rename(tmp, *configPath); err != nil {
-		return fail("%v", err)
-	}
-	verb := "routed through the broker"
-	if *revert {
-		verb = "restored"
-	}
-	fmt.Printf("%s: %s (file backup %s.pre-broker-%s)\n", strings.Join(changed, ", "), verb, *configPath, stamp)
 	return 0
 }
