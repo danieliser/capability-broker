@@ -48,7 +48,7 @@ func main() {
 	flag.IntVar(&cfg.Port, "port", cfg.Port, "Front port")
 	flag.StringVar(&cfg.DataDir, "data-dir", cfg.DataDir, "Data root (database, admin socket, admin token, secrets)")
 	noWP := flag.Bool("no-wordpress", false, "Do not start the wp-mcp-router child")
-	stateless := flag.Bool("stateless", false, "Serve sessionless Streamable HTTP (MCP 2026-07-28). Off by default: Claude Code 2.1.316 listed no tools from a sessionless endpoint; Codex 0.166 and the Go SDK client work either way")
+	stateless := flag.Bool("stateless", true, "Serve sessionless Streamable HTTP (MCP 2026-07-28); --stateless=false keeps Mcp-Session-Id sessions for older clients")
 	flag.Parse()
 
 	id := buildinfo.Current()

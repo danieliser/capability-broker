@@ -17,8 +17,8 @@ interactive sessions share ClickHouse, a WordPress fleet and a memory service. T
 ## What it does
 
 - **Transparent MCP.** `GET|POST /mcp/clickhouse`, `/mcp/wp-mcp-router`, `/mcp/memory` are Streamable HTTP MCP
-  endpoints (session mode by default; `--stateless` serves the MCP 2026-07-28 sessionless transport, which Codex
-  0.166 and the Go SDK client accept but Claude Code 2.1.316 did not list tools from when tested). `tools/list` returns
+  endpoints. Sessionless Streamable HTTP (MCP 2026-07-28) by default, verified with Claude Code 2.1.316, Codex 0.166
+  and the Go SDK client; `--stateless=false` keeps `Mcp-Session-Id` sessions for older clients. `tools/list` returns
   the upstream tool definitions filtered to what the caller's grant allows, plus one additive `verbose` flag.
 - **Grants, not credentials.** A caller holds a random bearer (`cbg_…` for agents, `cbc_…` for owner clients)
   bound to a capability set: named queries, sites, operations, namespaces, limits. Hashes at rest, revocation

@@ -4,7 +4,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
-- `--stateless` serves the sessionless Streamable HTTP of MCP 2026-07-28. Off by default: Claude Code 2.1.316 listed no tools from a sessionless endpoint in testing; Codex 0.166 and the Go SDK client worked in both modes.
+- Sessionless Streamable HTTP (MCP 2026-07-28) is the default transport, verified with Claude Code 2.1.316, Codex 0.166 and the Go SDK client; `--stateless=false` keeps `Mcp-Session-Id` sessions for older clients.
 
 Phase 1 of the capability broker (design: `docs/design.md`).
 
