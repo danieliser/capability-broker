@@ -4,6 +4,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+- Tool-agnostic hosting: every connector is a stdio MCP server from `~/.brokerd/connectors.yaml`; tools are discovered and exported verbatim; policy from `~/.brokerd/catalog.d/<name>.yaml`, else the embedded catalog, else a synthesized one. The native ClickHouse, WordPress and AutoMem adapters are gone; the stock `mcp-clickhouse`, `wp-mcp-router` and `mcp-automem` servers run as children with only their declared env.
+- Relay of progress (by token), sampling and elicitation (single in-flight call) from a child to the calling client.
+- rtk-style trimming of every compact response; JSON documents nested in string values are opened first.
+- `delete_memory` and `update_memory` are never exported; batch and supersede stores and id-fetch recalls are blocked for agent grants.
+- Health checks use tools/list (FastMCP servers reject the SDK ping) and never wait on a starting child.
+- Installer survives a changelog with no released entry and seeds `connectors.yaml`.
+
 - Sessionless Streamable HTTP (MCP 2026-07-28) is the default transport, verified with Claude Code 2.1.316, Codex 0.166 and the Go SDK client; `--stateless=false` keeps `Mcp-Session-Id` sessions for older clients.
 
 Phase 1 of the capability broker (design: `docs/design.md`).

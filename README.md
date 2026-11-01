@@ -27,13 +27,22 @@ interactive sessions share ClickHouse, a WordPress fleet and a memory service. T
 - **Operations as the policy key.** A tool call resolves to a stable operation id by tool name plus argument
   pattern (`run_query` with `@group.name` → `clickhouse.named_query`; `wp_run core/delete-post` → no operation,
   denied). The policy engine runs after argument enrichment, so an adapter cannot widen a call.
-- **Narrow adapters.** ClickHouse over HTTP as a dedicated read-only user with limits in its settings profile and
-  `param_` binding; the WordPress router hosted as one supervised stdio child with `status: draft` forced on
-  create/update abilities; AutoMem with namespace tags forced on store and scoped on recall.
+- **Tool-agnostic hosting.** Every connector is a stdio MCP server declared in `~/.brokerd/connectors.yaml`
+  (command, args, env with `${secret:…}` references). The broker starts it once, discovers its tools and exports
+  them verbatim; the child's environment is exactly what the connector declares plus `PATH` and `HOME`. Policy
+  comes from the connector's catalog: `~/.brokerd/catalog.d/<name>.yaml` if you wrote one, else the catalog
+  embedded for that name (`clickhouse`, `wp-mcp-router`, `memory`), else a synthesized one in which every tool is
+  an operation of its own name that an agent grant must list. Catalogs refer to small named hooks (resolve a
+  named query, force `status: draft`, force namespace tags, filter a recall by namespace, narrow a `site` enum)
+  rather than carrying code.
+- **Relay.** Progress notifications from the child reach the calling client by token; sampling and elicitation
+  requests are forwarded while exactly one call is in flight on that child (session mode only; the sessionless
+  transport rejects server-initiated requests by design).
 - **Receipts.** An append-only SQLite table with an `intent` row before every upstream call and an `outcome` row
   after, including denials. A failed intent write denies the call.
-- **Compact by default.** Each operation declares a compact response shape; `verbose: true` returns the upstream
-  payload.
+- **Compact by default.** Every response is trimmed rtk-style (long strings cut, arrays capped, deep trees pruned,
+  hypermedia keys dropped, JSON-in-string documents opened) unless the operation declares explicit fields;
+  `verbose: true` returns the upstream payload untouched.
 
 ## Install (macOS)
 
@@ -44,15 +53,14 @@ cd ~/Toolkit/capability-broker
 brokerd status          # admin socket + token under ~/.brokerd
 ```
 
-Secrets go in `~/.brokerd/secrets.json` (mode 0600):
+Secrets go in `~/.brokerd/secrets.json` (mode 0600), a flat object the connectors reference as `${secret:key}`:
 
 ```json
 { "clickhouse_password": "…", "automem_api_key": "…" }
 ```
 
-Configuration is environment-based (`BROKERD_PORT`, `BROKERD_DATA_DIR`, `BROKERD_CLICKHOUSE_URL`,
-`BROKERD_CLICKHOUSE_USER`, `BROKERD_WP_ROUTER_COMMAND`, `BROKERD_WP_ROUTER_CONFIG`, `BROKERD_AUTOMEM_URL`, …);
-see `pkg/config/config.go` for every variable and its default. The front binds loopback only.
+The installer seeds `~/.brokerd/connectors.yaml` from `connectors.example.yaml`; edit commands and env for your
+upstreams. Daemon settings are `BROKERD_PORT`, `BROKERD_HOST` (loopback only) and `BROKERD_DATA_DIR`.
 
 ## Use
 
@@ -93,7 +101,9 @@ A capabilities file:
 cmd/brokerd            daemon + CLI subcommands        pkg/mcpfront      per-connector MCP servers
 cmd/brokerd-probe      shell MCP client                pkg/api           front mux, admin socket, admin client
 pkg/auth               tokens, grants, capabilities    pkg/adapters/*    clickhouse, wordpress, memory
-pkg/catalog            operations + embedded tool defs pkg/audit         receipts
+pkg/catalog            operations, embedded catalogs   pkg/audit         receipts
+pkg/connectors         connectors.yaml                 pkg/compact       response trimming
+pkg/adapters/upstream  stdio child hosting, hooks, relay
 pkg/policy             the single authorization point  pkg/durable       SQLite schema
 ```
 
