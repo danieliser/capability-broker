@@ -13,7 +13,7 @@ LABEL="com.capability-broker.brokerd"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 LOG_DIR="$HOME/Library/Logs/capability-broker"
 
-VERSION="${BROKERD_VERSION:-$(grep -m1 -oE '^## \[[0-9][^]]*\]' "$SCRIPT_DIR/CHANGELOG.md" | tr -d '#[] ')}"
+VERSION="${BROKERD_VERSION:-$( { grep -m1 -oE '^## \[[0-9][^]]*\]' "$SCRIPT_DIR/CHANGELOG.md" || true; } | tr -d '#[] ')}"
 COMMIT="${BROKERD_COMMIT:-$(git -C "$SCRIPT_DIR" rev-parse HEAD)}"
 if [ -z "$VERSION" ]; then VERSION="0.0.0-dev.$(git -C "$SCRIPT_DIR" rev-parse --short HEAD)"; fi
 if [ -n "$(git -C "$SCRIPT_DIR" status --porcelain)" ] && [ "${ALLOW_DIRTY:-0}" != "1" ]; then
