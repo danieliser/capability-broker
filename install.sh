@@ -82,15 +82,15 @@ EOF
   # A loaded service refuses a second bootstrap (I/O error 5): unload, wait for launchd to drop it, then load.
   if launchctl print "gui/$(id -u)/$LABEL" >/dev/null 2>&1; then
     launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
-    for _ in $(seq 1 20); do launchctl print "gui/$(id -u)/$LABEL" >/dev/null 2>&1 || break; sleep 0.5; done
+    for _ in $(seq 1 60); do launchctl print "gui/$(id -u)/$LABEL" >/dev/null 2>&1 || break; sleep 0.5; done
   fi
   launchctl bootstrap "gui/$(id -u)" "$PLIST" || launchctl kickstart -k "gui/$(id -u)/$LABEL"
   echo "launchd agent $LABEL loaded; log at $LOG_DIR/brokerd.log"
-  for _ in $(seq 1 30); do
+  for _ in $(seq 1 90); do
     if curl -fsS "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1; then
       echo "healthy: $(curl -fsS "http://127.0.0.1:$PORT/healthz")"; exit 0
     fi
     sleep 1
   done
-  echo "error: brokerd did not answer /healthz within 30s"; exit 1
+  echo "error: brokerd did not answer /healthz within 90s"; exit 1
 fi

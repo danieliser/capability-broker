@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -114,13 +115,7 @@ func run(cfg config.Config, stateless bool) error {
 	} else if len(res.Added) == 0 {
 		logger.Warn("no connectors configured; copy connectors.example.yaml to the data dir", "path", cfg.ConnectorsPath())
 	}
-	defer func() {
-		for _, ad := range reg.Snapshot() {
-			if c, ok := ad.(interface{ Close() error }); ok {
-				_ = c.Close()
-			}
-		}
-	}()
+	defer closeAll(reg, 5*time.Second)
 	// Hot reload: poll the data-root files, and apply on SIGHUP too.
 	go reloader.Watch(ctx, 2*time.Second)
 	hup := make(chan os.Signal, 1)
@@ -178,10 +173,33 @@ func run(cfg config.Config, stateless bool) error {
 	case err := <-errCh:
 		return err
 	}
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// Clients hold long-lived streams (SSE, subscriptions/listen); a graceful drain would wait on them, so give
+	// in-flight calls 2s and then close.
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	_ = frontSrv.Shutdown(shutdownCtx)
-	_ = adminSrv.Shutdown(shutdownCtx)
+	if err := frontSrv.Shutdown(shutdownCtx); err != nil {
+		_ = frontSrv.Close()
+	}
+	if err := adminSrv.Shutdown(shutdownCtx); err != nil {
+		_ = adminSrv.Close()
+	}
 	_ = os.Remove(cfg.AdminSocketPath())
 	return nil
+}
+
+// closeAll stops every child in parallel and gives up after limit.
+func closeAll(reg *registry.Registry, limit time.Duration) {
+	done := make(chan struct{})
+	var wg sync.WaitGroup
+	for _, ad := range reg.Snapshot() {
+		if c, ok := ad.(interface{ Close() error }); ok {
+			wg.Add(1)
+			go func() { defer wg.Done(); _ = c.Close() }()
+		}
+	}
+	go func() { wg.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(limit):
+	}
 }
