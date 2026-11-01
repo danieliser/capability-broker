@@ -173,16 +173,14 @@ func run(cfg config.Config, stateless bool) error {
 	case err := <-errCh:
 		return err
 	}
-	// Clients hold long-lived streams (SSE, subscriptions/listen); a graceful drain would wait on them, so give
-	// in-flight calls 2s and then close.
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	if err := frontSrv.Shutdown(shutdownCtx); err != nil {
-		_ = frontSrv.Close()
+	// Clients hold long-lived idle streams (SSE, subscriptions/listen), so a graceful HTTP drain would wait on
+	// them. Wait only for tool calls actually running (up to 10s), then close.
+	deadline := time.Now().Add(10 * time.Second)
+	for front.InFlight() > 0 && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
 	}
-	if err := adminSrv.Shutdown(shutdownCtx); err != nil {
-		_ = adminSrv.Close()
-	}
+	_ = frontSrv.Close()
+	_ = adminSrv.Close()
 	_ = os.Remove(cfg.AdminSocketPath())
 	return nil
 }

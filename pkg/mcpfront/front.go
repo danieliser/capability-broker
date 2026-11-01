@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -45,6 +46,8 @@ type Front struct {
 	SessionTimeout time.Duration
 	// Stateless serves the sessionless Streamable HTTP of MCP 2026-07-28. Older clients negotiate down.
 	Stateless bool
+
+	inflight atomic.Int64 // tool calls in progress; shutdown waits on these, not on idle streams
 
 	mu       sync.Mutex
 	handlers map[string]http.Handler // endpoint key → SDK handler (one session store per endpoint)
@@ -347,7 +350,12 @@ func toolError(code, msg string) *mcp.CallToolResult {
 }
 
 // call is the single tools/call path.
+// InFlight reports how many tool calls are running.
+func (f *Front) InFlight() int64 { return f.inflight.Load() }
+
 func (f *Front) call(ctx context.Context, connector, tool string, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	f.inflight.Add(1)
+	defer f.inflight.Add(-1)
 	// The adapter is resolved at call time: a reload may have replaced or removed it.
 	ad, ok := f.Registry.Lookup(connector)
 	if !ok {
