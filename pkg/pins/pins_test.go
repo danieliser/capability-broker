@@ -12,11 +12,11 @@ import (
 
 func TestDetect(t *testing.T) {
 	cases := []struct {
-		cmd  string
-		args []string
+		cmd                 string
+		args                []string
 		kind, pkg, ver, bin string
-		rest int
-		ok   bool
+		rest                int
+		ok                  bool
 	}{
 		{"/x/npx", []string{"-y", "wp-mcp-router@latest"}, "npm", "wp-mcp-router", "latest", "", 0, true},
 		{"npx", []string{"-y", "@scope/srv@1.2.3", "--flag"}, "npm", "@scope/srv", "1.2.3", "", 1, true},
