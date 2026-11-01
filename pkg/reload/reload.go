@@ -105,13 +105,7 @@ func (r *Reloader) Apply(ctx context.Context) (Result, error) {
 		if base == nil {
 			base = context.Background()
 		}
-		go func(name string, ad *upstream.Adapter) {
-			if err := ad.Start(base); err != nil {
-				r.log("connector not started; degraded until first successful call", "connector", name, "err", err.Error())
-				return
-			}
-			r.Front.Refresh(base)
-		}(name, ad)
+		go r.startWithRetry(base, name, ad)
 	}
 	for _, name := range r.Registry.Names() {
 		if _, ok := want[name]; ok {
@@ -135,6 +129,32 @@ func (r *Reloader) Apply(ctx context.Context) (Result, error) {
 	}
 	r.filesSeen = r.fingerprint()
 	return res, nil
+}
+
+// startWithRetry keeps starting a child until it connects, the context ends, or a reload replaces it
+// (package runners like npx and uvx can take minutes on a slow network). Every success refreshes live
+// servers so clients get tools/list_changed.
+func (r *Reloader) startWithRetry(ctx context.Context, name string, ad *upstream.Adapter) {
+	backoff := 5 * time.Second
+	for attempt := 1; ; attempt++ {
+		err := ad.Start(ctx)
+		if err == nil {
+			r.Front.Refresh(ctx)
+			return
+		}
+		if cur, ok := r.Registry.Lookup(name); !ok || cur != ad {
+			return // replaced or removed while starting
+		}
+		r.log("connector not started; retrying", "connector", name, "attempt", attempt, "retry_in", backoff.String(), "err", err.Error())
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(backoff):
+		}
+		if backoff < time.Minute {
+			backoff *= 2
+		}
+	}
 }
 
 // Watch polls the watched files and applies when their fingerprint changes. It returns when ctx ends.

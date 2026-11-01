@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -32,7 +33,8 @@ type Adapter struct {
 	relay *relay
 	log   func(msg string, kv ...any)
 
-	mu        sync.Mutex // guards session, tools, conn, connected; held while the child starts
+	ready     atomic.Bool // set once the child is connected; read without the lock
+	mu        sync.Mutex  // guards session, tools, conn, connected; held while the child starts
 	session   *mcp.ClientSession
 	tools     []catalog.Tool
 	conn      *catalog.Connector
@@ -55,13 +57,7 @@ func (a *Adapter) Connector() string { return a.spec.Name }
 func (a *Adapter) Spec() *connectors.Spec { return a.spec }
 
 // Ready reports whether the child is connected, without waiting on a start in progress.
-func (a *Adapter) Ready() bool {
-	if !a.mu.TryLock() {
-		return false
-	}
-	defer a.mu.Unlock()
-	return a.session != nil
-}
+func (a *Adapter) Ready() bool { return a.ready.Load() }
 
 // catalogConn resolves the connector's catalog at use time: a reload may have replaced it.
 func (a *Adapter) catalogConn() *catalog.Connector {
@@ -97,6 +93,7 @@ func (a *Adapter) Start(ctx context.Context) error {
 func (a *Adapter) Close() error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	a.ready.Store(false)
 	if a.session != nil {
 		err := a.session.Close()
 		a.session = nil
@@ -141,6 +138,7 @@ func (a *Adapter) ensure(ctx context.Context) (*mcp.ClientSession, *catalog.Conn
 	}
 	conn := a.cat.Ensure(a.spec.Name, names)
 	a.session, a.tools, a.conn, a.connected = session, tools, conn, time.Now()
+	a.ready.Store(true)
 	a.log("connector connected", "connector", a.spec.Name, "tools", len(tools), "catalog", conn.Source)
 	if conn.SiteHostsTool != "" {
 		a.learnSites(cctx, session, conn.SiteHostsTool)
@@ -209,6 +207,7 @@ func walk(v any, fn func(map[string]any)) {
 func (a *Adapter) dropSession() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	a.ready.Store(false)
 	if a.session != nil {
 		_ = a.session.Close()
 		a.session = nil
