@@ -311,3 +311,19 @@ func TestHotAddedConnectorAppearsOnTheAggregateWithoutReconnecting(t *testing.T)
 		s.Close()
 	}
 }
+
+func TestEmptyAggregateStillAdvertisesTools(t *testing.T) {
+	h := newHarness(t)
+	_, tok, _ := h.store.Mint(context.Background(), auth.MintRequest{Kind: auth.KindClient, Name: "cc", Capabilities: auth.OwnerCapabilities(), IssuedBy: "t"})
+	s, err := mcp.NewClient(&mcp.Implementation{Name: "t", Version: "0"}, nil).Connect(context.Background(), &mcp.StreamableClientTransport{
+		Endpoint: h.srv.URL + "/mcp?exclude=clickhouse,memory", MaxRetries: -1, DisableStandaloneSSE: true,
+		HTTPClient: &http.Client{Transport: &bearerRT{token: tok, next: http.DefaultTransport}}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	caps := s.InitializeResult().Capabilities
+	if caps.Tools == nil || !caps.Tools.ListChanged {
+		t.Fatalf("empty aggregate must advertise tools with listChanged, got %+v", caps.Tools)
+	}
+}

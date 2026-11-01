@@ -188,7 +188,10 @@ func (f *Front) serverFor(ctx context.Context, endpoint string, g *auth.Grant, e
 		if endpoint == AggregateEndpoint {
 			name = "broker"
 		}
-		ls = &liveServer{server: mcp.NewServer(&mcp.Implementation{Name: name, Version: "1"}, &mcp.ServerOptions{Logger: f.Logger}),
+		ls = &liveServer{server: mcp.NewServer(&mcp.Implementation{Name: name, Version: "1"}, &mcp.ServerOptions{Logger: f.Logger,
+			// Declared up front: a server that starts with no tools (an aggregate whose connectors are all
+			// excluded, or still starting) must still tell the client it has tools and will announce changes.
+			Capabilities: &mcp.ServerCapabilities{Tools: &mcp.ToolCapabilities{ListChanged: true}}}),
 			grant: g, endpoint: endpoint, exclude: map[string]bool{}, toolHash: map[string]string{}, toolOwner: map[string]string{}}
 		for _, e := range exclude {
 			ls.exclude[e] = true
