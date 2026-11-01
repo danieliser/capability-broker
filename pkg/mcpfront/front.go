@@ -193,6 +193,7 @@ func (f *Front) serverFor(ctx context.Context, endpoint string, g *auth.Grant, e
 			name = "broker"
 		}
 		ls = &liveServer{server: mcp.NewServer(&mcp.Implementation{Name: name, Version: "1"}, &mcp.ServerOptions{Logger: f.Logger,
+			Instructions: f.instructions(endpoint, g, exclude),
 			// Declared up front: a server that starts with no tools (an aggregate whose connectors are all
 			// excluded, or still starting) must still tell the client it has tools and will announce changes.
 			Capabilities: &mcp.ServerCapabilities{Tools: &mcp.ToolCapabilities{ListChanged: true}}}),
@@ -208,6 +209,44 @@ func (f *Front) serverFor(ctx context.Context, endpoint string, g *auth.Grant, e
 		f.refreshOne(ctx, ls, true)
 	}
 	return ls.server
+}
+
+// instructions is the server's MCP `instructions`, which clients put in the model's context. Low-effort models
+// otherwise answer "I have no access" without looking at their tools (measured: GPT-6 Luna low skipped tools in
+// most failed runs). It names the live systems behind this server and says to use them.
+func (f *Front) instructions(endpoint string, g *auth.Grant, exclude []string) string {
+	skip := map[string]bool{}
+	for _, e := range exclude {
+		skip[e] = true
+	}
+	var names []string
+	if endpoint == AggregateEndpoint {
+		for _, n := range f.Registry.Names() {
+			if _, ok := g.Capabilities.For(n); ok && !skip[n] {
+				names = append(names, n)
+			}
+		}
+	} else {
+		names = []string{endpoint}
+	}
+	if len(names) == 0 {
+		return "Live connectors added to this server later appear as new tools; check your tool list when a task needs a system you do not see."
+	}
+	about := map[string]string{
+		"clickhouse":    "the ClickHouse data warehouse (SQL: databases, tables, counts)",
+		"memory":        "long-term memory (recall what was stored earlier, store new facts)",
+		"wp-mcp-router": "the WordPress sites (list sites, read and draft content)",
+	}
+	var parts []string
+	for _, n := range names {
+		if d, ok := about[n]; ok {
+			parts = append(parts, n+": "+d)
+		} else {
+			parts = append(parts, n)
+		}
+	}
+	return "These tools are live connections to: " + strings.Join(parts, "; ") +
+		". When a question needs data, remembered facts or site information, call these tools instead of answering from the conversation; your workspace being read-only does not limit them."
 }
 
 // Refresh re-derives every live server's tool list from the current registry and catalog and edits it in
