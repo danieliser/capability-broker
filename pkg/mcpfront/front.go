@@ -152,7 +152,7 @@ func (f *Front) handler(endpoint string) http.Handler {
 				}
 			}
 		}
-		return f.serverFor(r.Context(), endpoint, g, exclude, r.URL.Query().Get("prefix") == "none")
+		return f.serverFor(r.Context(), endpoint, g, exclude, r.URL.Query().Get("prefix") == "none", r.URL.Query().Get("instructions") == "none")
 	}, &mcp.StreamableHTTPOptions{SessionTimeout: f.SessionTimeout, Logger: f.Logger, Stateless: f.Stateless})
 	f.handlers[endpoint] = h
 	return h
@@ -179,9 +179,9 @@ func (f *Front) authenticate(r *http.Request) (*auth.Grant, string, string) {
 }
 
 // serverFor returns the stable server for (endpoint, grant, exclude), creating and populating it once.
-func (f *Front) serverFor(ctx context.Context, endpoint string, g *auth.Grant, exclude []string, plain bool) *mcp.Server {
+func (f *Front) serverFor(ctx context.Context, endpoint string, g *auth.Grant, exclude []string, plain, noInstructions bool) *mcp.Server {
 	sort.Strings(exclude)
-	key := endpoint + "|" + g.ID + "|" + strings.Join(exclude, ",") + fmt.Sprintf("|plain=%v", plain)
+	key := endpoint + "|" + g.ID + "|" + strings.Join(exclude, ",") + fmt.Sprintf("|plain=%v|noinst=%v", plain, noInstructions)
 	f.mu.Lock()
 	if f.servers == nil {
 		f.servers = map[string]*liveServer{}
@@ -193,7 +193,7 @@ func (f *Front) serverFor(ctx context.Context, endpoint string, g *auth.Grant, e
 			name = "broker"
 		}
 		ls = &liveServer{server: mcp.NewServer(&mcp.Implementation{Name: name, Version: "1"}, &mcp.ServerOptions{Logger: f.Logger,
-			Instructions: f.instructions(endpoint, g, exclude),
+			Instructions: map[bool]string{false: f.instructions(endpoint, g, exclude), true: ""}[noInstructions],
 			// Declared up front: a server that starts with no tools (an aggregate whose connectors are all
 			// excluded, or still starting) must still tell the client it has tools and will announce changes.
 			Capabilities: &mcp.ServerCapabilities{Tools: &mcp.ToolCapabilities{ListChanged: true}}}),
