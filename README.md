@@ -41,6 +41,10 @@ interactive sessions share ClickHouse, a WordPress fleet and a memory service. T
 - **Aggregate endpoint.** `/mcp` carries every connector the grant reaches as `<connector>__<tool>`;
   `?exclude=a,b` leaves out connectors a client already has as their own servers. That is the entry that makes a
   newly added connector usable mid-chat. Verified with Claude Code 2.1.316 in both transport modes.
+- **Pinned runners.** A connector run through `npx` or `uvx` is resolved to one version, installed under
+  `~/.brokerd/runtimes/<connector>/`, and run from there, so a start never waits on the registry. The original
+  command runs until the install exists. Pins are rechecked after `--pin-ttl` (24h); a newer version installs beside
+  the old one (one previous kept) and swaps in by hot reload. `pin: false` on a connector opts out.
 - **Relay.** Progress notifications from the child reach the calling client by token; sampling and elicitation
   requests are forwarded while exactly one call is in flight on that child (session mode only; the sessionless
   transport rejects server-initiated requests by design).

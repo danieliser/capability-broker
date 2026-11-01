@@ -4,6 +4,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+- npx/uvx connectors are pinned: the version is resolved once, installed under `~/.brokerd/runtimes`, and run directly; rechecked after `--pin-ttl` (24h); `pin: false` opts out. `pins.json` records what runs.
+- launchd `ProcessType` is `Standard`; `Background` throttled every MCP child (starts were 10 to 35 times slower).
+- Restart: health answers about 0.25s after a kill and pinned children connect within about 1.5s. Shutdown waits only for in-flight tool calls; children get a 1s grace.
+- A child that fails to start is retried with backoff until it connects; replaced children are closed in the background so a reload never waits on them.
+
 ## [0.2.0] - 2026-11-01
 
 - Hot reload of `connectors.yaml`, `secrets.json` and `catalog.d` (2s poll, `SIGHUP`, `brokerd reload` / `POST /v1/reload`); live sessions receive `tools/list_changed`. A connector added while a Claude Code session is running is usable in that session, verified in sessionless and session modes.
