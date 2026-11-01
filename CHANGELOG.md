@@ -4,6 +4,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-01
+
 - Agent evaluation in `docs/eval.md`: Haiku 5.5 and GPT-6 Luna at low effort, three client setups, six tasks. Setup and prefix do not matter; Codex agents need one sentence saying the tools are live.
 - A grant mints one `broker` server with upstream tool names; per-connector URLs are returned in `connector_servers`.
 
