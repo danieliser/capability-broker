@@ -86,6 +86,9 @@ brokerd grant revoke <grant-id>
 # your own sessions: Claude Code, Codex, Cursor and OpenCode, each with its own owner token
 brokerd client install all                # or claude-code | codex | cursor | opencode
 brokerd client install all --revert       # restore the original entries
+# Installed clients are managed: when a connector is added or removed, the daemon updates each client's config.
+# An open chat reaches a new connector through `broker` (mcp__broker__<connector>__<tool>); the next chat sees it
+# as its own server with the upstream's tool names.
 
 # apply config changes now instead of within 2s
 brokerd reload

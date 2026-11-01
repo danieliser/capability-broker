@@ -4,6 +4,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+- Installed clients are kept in step: adding or removing a connector updates every managed client's config (its own entry plus the `broker` exclude list), so a connector added mid-chat is its own server from the next chat on. Unchanged configs are not rewritten; a config that changes while being edited is retried.
+
 ## [0.3.0] - 2026-11-01
 
 - npx/uvx connectors are pinned: the version is resolved once, installed under `~/.brokerd/runtimes`, and run directly; rechecked after `--pin-ttl` (24h); `pin: false` opts out. `pins.json` records what runs.
