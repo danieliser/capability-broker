@@ -4,6 +4,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+- Hot reload of `connectors.yaml`, `secrets.json` and `catalog.d` (2s poll, `SIGHUP`, `brokerd reload` / `POST /v1/reload`); live sessions receive `tools/list_changed`. A connector added while a Claude Code session is running is usable in that session, verified in sessionless and session modes.
+- `/mcp` aggregate endpoint (`<connector>__<tool>`, `?exclude=`); every server advertises `tools{listChanged}` even when empty.
+- `brokerd client install <claude-code|codex|cursor|opencode|all>` with per-client owner tokens, per-connector entries plus one `broker` aggregate entry, backups under `~/.brokerd/clients`, lossless `--revert`; Codex `config.toml` is edited table by table.
+- Owners reach `update_memory`, `delete_memory` and `wp_run_across`; agents need the explicit `update`, `delete` or `run_across` operation, with namespace checks.
+- A client connect waits at most 5s on a cold child; tools arrive by `tools/list_changed`. Shutdown is bounded (2s drain, children closed in parallel): a restart takes about 4s instead of up to 70s.
+
 ## [0.1.0] - 2026-11-01
 
 - Tool-agnostic hosting: every connector is a stdio MCP server from `~/.brokerd/connectors.yaml`; tools are discovered and exported verbatim; policy from `~/.brokerd/catalog.d/<name>.yaml`, else the embedded catalog, else a synthesized one. The native ClickHouse, WordPress and AutoMem adapters are gone; the stock `mcp-clickhouse`, `wp-mcp-router` and `mcp-automem` servers run as children with only their declared env.

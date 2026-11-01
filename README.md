@@ -35,6 +35,12 @@ interactive sessions share ClickHouse, a WordPress fleet and a memory service. T
   an operation of its own name that an agent grant must list. Catalogs refer to small named hooks (resolve a
   named query, force `status: draft`, force namespace tags, filter a recall by namespace, narrow a `site` enum)
   rather than carrying code.
+- **Hot reload.** `connectors.yaml`, `secrets.json` and `catalog.d/*.yaml` are polled every 2 seconds (also
+  `SIGHUP`, `brokerd reload`). Added connectors start, changed ones restart, removed ones stop; a file that fails to
+  parse changes nothing. Every connected MCP session gets `tools/list_changed`, so an open chat sees the change.
+- **Aggregate endpoint.** `/mcp` carries every connector the grant reaches as `<connector>__<tool>`;
+  `?exclude=a,b` leaves out connectors a client already has as their own servers. That is the entry that makes a
+  newly added connector usable mid-chat. Verified with Claude Code 2.1.316 in both transport modes.
 - **Relay.** Progress notifications from the child reach the calling client by token; sampling and elicitation
   requests are forwarded while exactly one call is in flight on that child (session mode only; the sessionless
   transport rejects server-initiated requests by design).
@@ -73,9 +79,12 @@ brokerd grant mint --agent my.agent --session s1 --project companykit --capabili
 brokerd grant list
 brokerd grant revoke <grant-id>
 
-# your own sessions
-brokerd client mint --name claude-code
-brokerd client install claude-code        # rewrites clickhouse/memory/wp-mcp-router in ~/.claude.json (backup kept)
+# your own sessions: Claude Code, Codex, Cursor and OpenCode, each with its own owner token
+brokerd client install all                # or claude-code | codex | cursor | opencode
+brokerd client install all --revert       # restore the original entries
+
+# apply config changes now instead of within 2s
+brokerd reload
 
 # receipts
 brokerd receipts --limit 50
