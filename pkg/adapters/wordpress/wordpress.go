@@ -257,6 +257,16 @@ func (a *Adapter) Execute(ctx context.Context, call adapter.Call) (*adapter.Resu
 		msg, _ := json.Marshal(payload)
 		return nil, adapter.Failed(string(msg))
 	}
+	// The router wraps the site's MCP result: {site, result: {content, isError, structuredContent}}.
+	// A site-side error is still an error for the agent, with the site's text and a stable code.
+	if outer, ok := payload.(map[string]any); ok {
+		if inner, ok := outer["result"].(map[string]any); ok {
+			if isErr, _ := inner["isError"].(bool); isErr {
+				msg, _ := json.Marshal(map[string]any{"site": outer["site"], "error": unwrapResult(inner)})
+				return nil, adapter.Failed(string(msg))
+			}
+		}
+	}
 	compact := shapeCompact(payload, adapter.FieldsFromCompact(call.Op))
 	return &adapter.Result{Compact: compact, Verbose: payload, Outcome: adapter.OutcomeCompleted, OutcomeClass: "ok", Account: site}, nil
 }
@@ -288,15 +298,53 @@ func payloadOf(res *mcp.CallToolResult) any {
 	return joined
 }
 
+// unwrapResult turns the site's MCP result into its payload: structuredContent when present,
+// otherwise the text content parsed as JSON, otherwise the joined text.
+func unwrapResult(inner map[string]any) any {
+	if sc, ok := inner["structuredContent"]; ok && sc != nil {
+		if m, ok := sc.(map[string]any); ok {
+			if data, ok := m["data"]; ok && len(m) <= 2 {
+				return data
+			}
+		}
+		return sc
+	}
+	var texts []string
+	if content, ok := inner["content"].([]any); ok {
+		for _, c := range content {
+			if cm, ok := c.(map[string]any); ok {
+				if s, ok := cm["text"].(string); ok {
+					texts = append(texts, s)
+				}
+			}
+		}
+	}
+	joined := strings.Join(texts, "\n")
+	var parsed any
+	if err := json.Unmarshal([]byte(joined), &parsed); err == nil {
+		if m, ok := parsed.(map[string]any); ok {
+			if data, ok := m["data"]; ok && len(m) <= 2 {
+				return data
+			}
+		}
+		return parsed
+	}
+	return joined
+}
+
 // shapeCompact keeps the declared fields of an object, or of each object in a list.
 func shapeCompact(payload any, fields []string) any {
-	if len(fields) == 0 {
-		return payload
-	}
 	switch t := payload.(type) {
 	case map[string]any:
-		if inner, ok := t["result"]; ok {
+		if inner, ok := t["result"].(map[string]any); ok {
+			// An MCP result wrapper has a content *array* (a post's content is a string).
+			if _, wrapped := inner["content"].([]any); wrapped {
+				return map[string]any{"result": shapeCompact(unwrapResult(inner), fields), "site": t["site"]}
+			}
 			return map[string]any{"result": shapeCompact(inner, fields), "site": t["site"]}
+		}
+		if len(fields) == 0 {
+			return t
 		}
 		// Only post-like objects (those carrying an id) are reduced to the declared fields;
 		// anything else (site info, taxonomies, settings) passes through unchanged.
@@ -305,6 +353,9 @@ func shapeCompact(payload any, fields []string) any {
 		}
 		return adapter.PickFields(t, fields)
 	case []any:
+		if len(fields) == 0 {
+			return t
+		}
 		out := make([]any, 0, len(t))
 		for _, x := range t {
 			out = append(out, shapeCompact(x, fields))
