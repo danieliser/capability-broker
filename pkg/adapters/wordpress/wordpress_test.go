@@ -98,3 +98,16 @@ func TestDraftForcedSiteNarrowedAndCompacted(t *testing.T) {
 		t.Fatalf("account %q", res.Account)
 	}
 }
+
+func TestSiteHostsNeverWaitsOnChildStartup(t *testing.T) {
+	a := New(config.WordPress{Timeout: time.Second}, adapter.Must(catalog.Load()))
+	a.mu.Lock() // simulates ensure() holding the lock while npx starts
+	defer a.mu.Unlock()
+	done := make(chan struct{})
+	go func() { a.SiteHosts(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("SiteHosts blocked behind the child-startup lock")
+	}
+}

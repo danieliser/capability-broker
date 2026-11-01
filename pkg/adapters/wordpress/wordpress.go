@@ -28,11 +28,14 @@ type Adapter struct {
 	cat  *catalog.Catalog
 	conn *catalog.Connector
 
-	mu        sync.Mutex
+	mu        sync.Mutex // guards session, tools, connected; held while the child starts
 	session   *mcp.ClientSession
 	tools     []catalog.Tool
-	siteHosts map[string]string
 	connected time.Time
+	// siteHosts has its own lock: policy reads it on every call of every connector, and must never wait
+	// on the router child's startup.
+	hostsMu   sync.RWMutex
+	siteHosts map[string]string
 }
 
 func New(cfg config.WordPress, cat *catalog.Catalog) *Adapter {
@@ -44,8 +47,8 @@ func (a *Adapter) Connector() string { return "wp-mcp-router" }
 
 // SiteHosts returns site id → hostname, learned from wp_list_sites at connect time.
 func (a *Adapter) SiteHosts() map[string]string {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.hostsMu.RLock()
+	defer a.hostsMu.RUnlock()
 	out := map[string]string{}
 	for k, v := range a.siteHosts {
 		out[k] = v
@@ -150,6 +153,7 @@ func (a *Adapter) learnSites(ctx context.Context, s *mcp.ClientSession) {
 			}
 		}
 	}
+	hosts := map[string]string{}
 	walk(payload, func(obj map[string]any) {
 		id, _ := obj["id"].(string)
 		raw, _ := obj["url"].(string)
@@ -157,9 +161,12 @@ func (a *Adapter) learnSites(ctx context.Context, s *mcp.ClientSession) {
 			return
 		}
 		if u, err := url.Parse(raw); err == nil && u.Hostname() != "" {
-			a.siteHosts[id] = strings.ToLower(u.Hostname())
+			hosts[id] = strings.ToLower(u.Hostname())
 		}
 	})
+	a.hostsMu.Lock()
+	a.siteHosts = hosts
+	a.hostsMu.Unlock()
 }
 
 func walk(v any, fn func(map[string]any)) {
