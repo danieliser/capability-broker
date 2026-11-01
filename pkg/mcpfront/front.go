@@ -245,9 +245,20 @@ func (f *Front) refreshOne(ctx context.Context, ls *liveServer, initial bool) {
 		if !ok {
 			continue
 		}
-		if r, ok := ad.(readiness); ok && !r.Ready() && !initial {
-			keep[name] = true
-			continue
+		if r, ok := ad.(readiness); ok && !r.Ready() {
+			// Never hold a client's connect on a cold child (npx starts take up to a minute; clients give up at
+			// 30s). Wait briefly on first population, then serve what is ready: the reloader refreshes when the
+			// child connects and the client gets tools/list_changed.
+			if initial {
+				deadline := time.Now().Add(5 * time.Second)
+				for !r.Ready() && time.Now().Before(deadline) {
+					time.Sleep(100 * time.Millisecond)
+				}
+			}
+			if !r.Ready() {
+				keep[name] = true
+				continue
+			}
 		}
 		tools, err := ad.Tools(ctx, ls.grant)
 		if err != nil {
