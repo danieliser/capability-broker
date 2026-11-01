@@ -4,6 +4,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+- `--stateless` serves the sessionless Streamable HTTP of MCP 2026-07-28. Off by default: Claude Code 2.1.316 listed no tools from a sessionless endpoint in testing; Codex 0.166 and the Go SDK client worked in both modes.
+
 Phase 1 of the capability broker (design: `docs/design.md`).
 
 - `brokerd` daemon: loopback Streamable HTTP MCP endpoint per connector (`/mcp/clickhouse`, `/mcp/wp-mcp-router`,
