@@ -4,6 +4,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+- `brokerd client install --mode single|servers --prefix connector|none`. Single mode (default) gives each client one `broker` server whose tools pass straight through; `/mcp?prefix=none` keeps upstream tool names and prefixes only names two connectors share.
+
 ## [0.4.0] - 2026-11-01
 
 - Installed clients are kept in step: adding or removing a connector updates every managed client's config (its own entry plus the `broker` exclude list), so a connector added mid-chat is its own server from the next chat on. Unchanged configs are not rewritten; a config that changes while being edited is retried.
