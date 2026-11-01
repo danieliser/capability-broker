@@ -1,0 +1,74 @@
+name: Release
+
+# Runs trusted workflow code from `main` after a `release/X.Y.Z` pull request merges. Re-checks that the
+# merged head is still the version the PR named, that the tag does not exist yet, builds the binaries from
+# that exact commit, tags it and publishes a GitHub release with the changelog section as notes.
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: refuse a stale release
+        id: meta
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          VERSION="${HEAD_REF#release/}"
+          HEAD="$(git rev-parse HEAD)"
+          test "$HEAD" = "$MERGE_SHA" \
+            || { echo "main ($HEAD) moved past the merge commit; refusing"; exit 1; }
+          scripts/release-check.sh "release/${VERSION}"
+          git fetch --tags
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+            echo "tag v${VERSION} already exists"; exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "sha=${HEAD}" >> "$GITHUB_OUTPUT"
+      - name: build artifacts
+        run: |
+          V="${{ steps.meta.outputs.version }}"; C="${{ steps.meta.outputs.sha }}"
+          for target in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64; do
+            os="${target%/*}"; arch="${target#*/}"
+            GOOS="$os" GOARCH="$arch" scripts/build.sh "$V" "$C" "dist/brokerd_${V}_${os}_${arch}/brokerd"
+            GOOS="$os" GOARCH="$arch" go build -trimpath -o "dist/brokerd_${V}_${os}_${arch}/brokerd-probe" ./cmd/brokerd-probe
+            tar -C dist -czf "dist/brokerd_${V}_${os}_${arch}.tar.gz" "brokerd_${V}_${os}_${arch}"
+          done
+          (cd dist && shasum -a 256 *.tar.gz > SHA256SUMS)
+      - name: release notes from the changelog
+        run: scripts/changelog-section.sh "${{ steps.meta.outputs.version }}" > dist/NOTES.md && cat dist/NOTES.md
+      - name: tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ steps.meta.outputs.version }}" -m "brokerd ${{ steps.meta.outputs.version }}" "${{ steps.meta.outputs.sha }}"
+          git push origin "v${{ steps.meta.outputs.version }}"
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          tag_name: v${{ steps.meta.outputs.version }}
+          name: brokerd ${{ steps.meta.outputs.version }}
+          body_path: dist/NOTES.md
+          files: |
+            dist/*.tar.gz
+            dist/SHA256SUMS

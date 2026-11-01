@@ -38,8 +38,12 @@ type Front struct {
 	Adapters map[string]adapter.Adapter
 	Sites    SiteHostSource
 	Logger   *slog.Logger
-	// SessionTimeout closes idle MCP sessions; zero keeps them.
+	// SessionTimeout closes idle MCP sessions (legacy stateful mode); zero keeps them.
 	SessionTimeout time.Duration
+	// Stateless serves the sessionless Streamable HTTP of MCP 2026-07-28 (no Mcp-Session-Id, GET/DELETE 405,
+	// one ephemeral session per request). Older clients still negotiate down; the SDK handles both. Every call is
+	// authenticated per request anyway, so this is the natural mode for the broker.
+	Stateless bool
 
 	mu      sync.Mutex
 	servers map[string]*mcp.Server
@@ -75,7 +79,7 @@ func (f *Front) Handler(connector string) http.Handler {
 			return nil
 		}
 		return f.serverFor(r.Context(), connector, g, ad)
-	}, &mcp.StreamableHTTPOptions{SessionTimeout: f.SessionTimeout, Logger: f.Logger})
+	}, &mcp.StreamableHTTPOptions{SessionTimeout: f.SessionTimeout, Logger: f.Logger, Stateless: f.Stateless})
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		g, code, msg := f.authenticate(r)

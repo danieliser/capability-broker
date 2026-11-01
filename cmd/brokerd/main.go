@@ -48,6 +48,7 @@ func main() {
 	flag.IntVar(&cfg.Port, "port", cfg.Port, "Front port")
 	flag.StringVar(&cfg.DataDir, "data-dir", cfg.DataDir, "Data root (database, admin socket, admin token, secrets)")
 	noWP := flag.Bool("no-wordpress", false, "Do not start the wp-mcp-router child")
+	stateless := flag.Bool("stateless", true, "Serve sessionless Streamable HTTP (MCP 2026-07-28); false keeps Mcp-Session-Id sessions")
 	flag.Parse()
 
 	id := buildinfo.Current()
@@ -69,12 +70,12 @@ func main() {
 	if ip := net.ParseIP(cfg.Host); ip == nil || !ip.IsLoopback() {
 		log.Fatalf("front host must be a loopback address, got %q", cfg.Host)
 	}
-	if err := run(cfg, *noWP); err != nil {
+	if err := run(cfg, *noWP, *stateless); err != nil {
 		log.Fatalf("brokerd: %v", err)
 	}
 }
 
-func run(cfg config.Config, noWP bool) error {
+func run(cfg config.Config, noWP bool, stateless bool) error {
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	logger.Info("brokerd starting", "version", buildinfo.Version, "commit", buildinfo.Commit, "data_dir", cfg.DataDir)
 	if err := os.MkdirAll(cfg.DataDir, 0o700); err != nil {
@@ -126,7 +127,7 @@ func run(cfg config.Config, noWP bool) error {
 		}()
 		defer wp.Close()
 	}
-	front := &mcpfront.Front{Store: store, Catalog: cat, Audit: writer, Adapters: adapters, Sites: sites, Logger: logger, SessionTimeout: 30 * time.Minute}
+	front := &mcpfront.Front{Store: store, Catalog: cat, Audit: writer, Adapters: adapters, Sites: sites, Logger: logger, SessionTimeout: 30 * time.Minute, Stateless: stateless}
 	connectors := make([]string, 0, len(adapters))
 	for name := range adapters {
 		connectors = append(connectors, name)
@@ -145,7 +146,7 @@ func run(cfg config.Config, noWP bool) error {
 
 	errCh := make(chan error, 2)
 	go func() {
-		logger.Info("front listening", "addr", cfg.FrontAddr(), "connectors", connectors)
+		logger.Info("front listening", "addr", cfg.FrontAddr(), "connectors", connectors, "stateless", stateless)
 		if err := frontSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- fmt.Errorf("front: %w", err)
 		}

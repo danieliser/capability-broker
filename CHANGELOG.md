@@ -1,8 +1,12 @@
 # Changelog
 
-## 0.1.0 — 2026-11-01
+Format follows [Keep a Changelog](https://keepachangelog.com/); versions are semver tags on `main`.
 
-Phase 1 of the capability broker (design: `~/Projects/skill-workspaces/agent-fleet/2026-11-01/capability-broker-design.md`).
+## [Unreleased]
+
+## [0.1.0] - 2026-11-01
+
+Phase 1 of the capability broker (design: `docs/design.md`).
 
 - `brokerd` daemon: loopback Streamable HTTP MCP endpoint per connector (`/mcp/clickhouse`, `/mcp/wp-mcp-router`,
   `/mcp/memory`), admin surface on a Unix socket, SQLite grants + append-only receipts, launchd install.

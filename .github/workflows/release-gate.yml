@@ -1,0 +1,41 @@
+name: Release gate
+
+# A release is a reviewed pull request from a `release/X.Y.Z` branch of this repository into `main`.
+# This gate runs against the proposed merge commit and refuses a PR whose branch, changelog and build
+# identity disagree. Merging it is what publishes (see release.yml); nothing else does.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    if: startsWith(github.head_ref, 'release/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: same-repository branch only
+        env:
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          test "$HEAD_REPO" = "$GITHUB_REPOSITORY" \
+            || { echo "release PRs must come from this repository, not a fork"; exit 1; }
+      - name: version, changelog and tag checks
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: scripts/release-check.sh "$HEAD_REF"
+      - name: candidate build verifies its identity
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          VERSION="${HEAD_REF#release/}"
+          scripts/build.sh "$VERSION" "$HEAD_SHA" dist/brokerd
+          dist/brokerd --require-build "${VERSION}@${HEAD_SHA}"

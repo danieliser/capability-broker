@@ -55,6 +55,8 @@ type harness struct {
 	fake  *fakeCH
 }
 
+var statelessMode = true
+
 func newHarness(t *testing.T) *harness {
 	t.Helper()
 	db, err := durable.Open(context.Background(), filepath.Join(t.TempDir(), "f.db"))
@@ -68,7 +70,7 @@ func newHarness(t *testing.T) *harness {
 	}
 	fake := &fakeCH{cat: cat}
 	f := &Front{Store: auth.NewStore(db), Catalog: cat, Audit: audit.NewWriter(db), Adapters: map[string]adapter.Adapter{"clickhouse": fake, "memory": fake},
-		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Stateless: statelessMode}
 	mux := http.NewServeMux()
 	mux.Handle("/mcp/clickhouse", f.Handler("clickhouse"))
 	mux.Handle("/mcp/memory", f.Handler("memory"))
@@ -225,4 +227,11 @@ func TestTwoGrantsOneBackend(t *testing.T) {
 	if r, err := sb.CallTool(context.Background(), &mcp.CallToolParams{Name: "run_query", Arguments: map[string]any{"query": "@scheduler.freshness"}}); err != nil || r.IsError {
 		t.Fatalf("second grant broken by first's revocation: %v %s", err, text(r))
 	}
+}
+
+func TestLegacyStatefulModeStillWorks(t *testing.T) {
+	statelessMode = false
+	defer func() { statelessMode = true }()
+	TestAgentSeesOnlyGrantedToolsAndCanRunNamedQuery(t)
+	TestRevokeMidSession(t)
 }
