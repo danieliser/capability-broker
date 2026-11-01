@@ -4,6 +4,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+- Default install is one `broker` server with upstream tool names (`--prefix none`); measured equal to per-connector servers for Haiku 5.5 and GPT-6 Luna at low effort.
+- MCP server instructions name the live connectors behind each server (Claude Code shows them to the model; Codex drops them). `?instructions=none` and `?hint=live` exist for A/B tests.
+
 - `brokerd client install --mode single|servers --prefix connector|none`. Single mode (default) gives each client one `broker` server whose tools pass straight through; `/mcp?prefix=none` keeps upstream tool names and prefixes only names two connectors share.
 
 ## [0.4.0] - 2026-11-01

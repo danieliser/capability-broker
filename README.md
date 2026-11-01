@@ -87,7 +87,10 @@ brokerd grant revoke <grant-id>
 brokerd client install all                # or claude-code | codex | cursor | opencode
 #   --mode single (default): one `broker` server carrying every connector; tools pass through
 #   --mode servers: one server entry per connector plus `broker` for connectors added later
-#   --prefix connector (default): tools named <connector>__<tool>; none: upstream names, prefixed only on a clash
+#   --prefix none (default): upstream tool names, prefixed only where two connectors clash; connector: <connector>__<tool>
+# Measured (docs/eval.md): Haiku 5.5 and GPT-6 Luna at low effort do equally well with per-connector servers, one
+# prefixed broker or one plain broker. Codex drops MCP server instructions, so Codex agents need one sentence of
+# standing instructions saying the tools are live (Luna 14/18 without it, 18/18 with it).
 brokerd client install all --revert       # restore the original entries
 # Installed clients are managed: when a connector is added or removed, the daemon updates each client's config.
 # An open chat reaches a new connector through `broker` (mcp__broker__<connector>__<tool>); the next chat sees it
