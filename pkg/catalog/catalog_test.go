@@ -35,7 +35,7 @@ func TestLoadAndResolve(t *testing.T) {
 	if ok {
 		t.Fatalf("delete-post resolved to %v; must be denied by name", op.ID)
 	}
-	if !wp.ToolExposed("wp_run") || wp.ToolExposed("wp_run_across") || wp.ToolExposed("never_listed") {
+	if !wp.ToolExposed("wp_run") || !wp.ToolExposed("wp_run_across") || wp.ToolExposed("never_listed") {
 		t.Fatal("tool exposure wrong")
 	}
 	synth := c.Ensure("thing", []string{"do_x", "do_y"})

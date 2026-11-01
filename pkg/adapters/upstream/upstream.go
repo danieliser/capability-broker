@@ -51,6 +51,32 @@ func New(spec *connectors.Spec, cat *catalog.Catalog, log func(msg string, kv ..
 
 func (a *Adapter) Connector() string { return a.spec.Name }
 
+// Spec is the connector definition this adapter was built from (the reloader diffs on it).
+func (a *Adapter) Spec() *connectors.Spec { return a.spec }
+
+// Ready reports whether the child is connected, without waiting on a start in progress.
+func (a *Adapter) Ready() bool {
+	if !a.mu.TryLock() {
+		return false
+	}
+	defer a.mu.Unlock()
+	return a.session != nil
+}
+
+// catalogConn resolves the connector's catalog at use time: a reload may have replaced it.
+func (a *Adapter) catalogConn() *catalog.Connector {
+	if c, ok := a.cat.Connector(a.spec.Name); ok {
+		return c
+	}
+	a.mu.Lock()
+	names := make([]string, 0, len(a.tools))
+	for _, t := range a.tools {
+		names = append(names, t.Name)
+	}
+	a.mu.Unlock()
+	return a.cat.Ensure(a.spec.Name, names)
+}
+
 // SiteHosts returns site id → hostname learned from the catalog's site_hosts_tool.
 func (a *Adapter) SiteHosts() map[string]string {
 	a.hostsMu.RLock()
@@ -213,8 +239,9 @@ func (a *Adapter) Tools(ctx context.Context, g *auth.Grant) ([]catalog.Tool, err
 		return nil, err
 	}
 	a.mu.Lock()
-	tools, conn := a.tools, a.conn
+	tools := a.tools
 	a.mu.Unlock()
+	conn := a.catalogConn()
 	cap, _ := g.Capabilities.For(a.spec.Name)
 	owner := g.Capabilities.IsOwner()
 	out := make([]catalog.Tool, 0, len(tools))

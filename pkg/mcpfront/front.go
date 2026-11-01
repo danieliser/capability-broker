@@ -6,11 +6,14 @@ package mcpfront
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -22,6 +25,7 @@ import (
 	"github.com/danieliser/capability-broker/pkg/auth"
 	"github.com/danieliser/capability-broker/pkg/catalog"
 	"github.com/danieliser/capability-broker/pkg/policy"
+	"github.com/danieliser/capability-broker/pkg/registry"
 )
 
 type ctxKey int
@@ -35,17 +39,33 @@ type Front struct {
 	Store    *auth.Store
 	Catalog  *catalog.Catalog
 	Audit    *audit.Writer
-	Adapters map[string]adapter.Adapter
+	Registry *registry.Registry
 	Logger   *slog.Logger
 	// SessionTimeout closes idle MCP sessions (legacy stateful mode); zero keeps them.
 	SessionTimeout time.Duration
-	// Stateless serves the sessionless Streamable HTTP of MCP 2026-07-28 (no Mcp-Session-Id, GET/DELETE 405,
-	// one ephemeral session per request). Older clients still negotiate down; the SDK handles both. Every call is
-	// authenticated per request anyway, so this is the natural mode for the broker.
+	// Stateless serves the sessionless Streamable HTTP of MCP 2026-07-28. Older clients negotiate down.
 	Stateless bool
 
-	mu      sync.Mutex
-	servers map[string]*mcp.Server
+	mu       sync.Mutex
+	handlers map[string]http.Handler // endpoint key → SDK handler (one session store per endpoint)
+	servers  map[string]*liveServer  // endpoint key + grant → stable server, tools edited in place
+}
+
+// AggregateEndpoint is the single endpoint that carries every connector the grant reaches, with tool names
+// prefixed `<connector>__`. A connector added to connectors.yaml appears there without the client
+// reconnecting: the server sends tools/list_changed.
+const AggregateEndpoint = "*"
+
+// liveServer is one grant's view of one endpoint. Its tools are refreshed in place on reload so connected
+// sessions (legacy or 2026-07-28 subscriptions/listen) receive tools/list_changed instead of going stale.
+type liveServer struct {
+	mu        sync.Mutex
+	server    *mcp.Server
+	grant     *auth.Grant
+	endpoint  string          // connector name, or AggregateEndpoint
+	exclude   map[string]bool // aggregate only: connectors the client already has as their own servers
+	toolHash  map[string]string
+	toolOwner map[string]string // exported name → connector
 }
 
 type errorBody struct {
@@ -63,41 +83,75 @@ func writeError(w http.ResponseWriter, status int, code, msg string) {
 	_ = json.NewEncoder(w).Encode(b)
 }
 
-// Handler serves /mcp/<connector>. Authentication happens here on every HTTP
+// ServeConnector serves /mcp/<connector>; ServeAggregate serves /mcp. Authentication happens on every HTTP
 // request; the tool handler re-authenticates from the request header too.
-func (f *Front) Handler(connector string) http.Handler {
-	ad, ok := f.Adapters[connector]
-	if !ok {
-		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			writeError(w, http.StatusNotFound, "BROKER_UNKNOWN_CONNECTOR", "no connector "+connector)
-		})
+func (f *Front) ServeConnector(w http.ResponseWriter, r *http.Request, connector string) {
+	if _, ok := f.Registry.Lookup(connector); !ok {
+		writeError(w, http.StatusNotFound, "BROKER_UNKNOWN_CONNECTOR", "no connector "+connector)
+		return
 	}
-	mcpHandler := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
+	g := f.gate(w, r, connector)
+	if g == nil {
+		return
+	}
+	f.handler(connector).ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), grantKey, g)))
+}
+
+func (f *Front) ServeAggregate(w http.ResponseWriter, r *http.Request) {
+	g := f.gate(w, r, "")
+	if g == nil {
+		return
+	}
+	f.handler(AggregateEndpoint).ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), grantKey, g)))
+}
+
+func (f *Front) gate(w http.ResponseWriter, r *http.Request, connector string) *auth.Grant {
+	label := connector
+	if label == "" {
+		label = "broker"
+	}
+	g, code, msg := f.authenticate(r)
+	if g == nil {
+		f.Audit.Denied(r.Context(), audit.Call{Principal: "unauthenticated", Connector: label, Tool: "-"}, code, msg)
+		writeError(w, http.StatusUnauthorized, code, msg)
+		return nil
+	}
+	if connector != "" {
+		if _, ok := g.Capabilities.For(connector); !ok {
+			f.Audit.Denied(r.Context(), audit.Call{Grant: g, Connector: connector, Tool: "-"}, policy.CodeDeniedConnector, "grant does not reach "+connector)
+			writeError(w, http.StatusForbidden, policy.CodeDeniedConnector, "grant does not reach connector "+connector)
+			return nil
+		}
+	}
+	return g
+}
+
+func (f *Front) handler(endpoint string) http.Handler {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.handlers == nil {
+		f.handlers = map[string]http.Handler{}
+	}
+	if h, ok := f.handlers[endpoint]; ok {
+		return h
+	}
+	h := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
 		g, _ := r.Context().Value(grantKey).(*auth.Grant)
 		if g == nil {
 			return nil
 		}
-		return f.serverFor(r.Context(), connector, g, ad)
-	}, &mcp.StreamableHTTPOptions{SessionTimeout: f.SessionTimeout, Logger: f.Logger, Stateless: f.Stateless})
-
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		g, code, msg := f.authenticate(r)
-		if g == nil {
-			status := http.StatusUnauthorized
-			if code == policy.CodeDeniedConnector {
-				status = http.StatusForbidden
+		var exclude []string
+		if endpoint == AggregateEndpoint {
+			for _, e := range strings.Split(r.URL.Query().Get("exclude"), ",") {
+				if e = strings.TrimSpace(e); e != "" {
+					exclude = append(exclude, e)
+				}
 			}
-			f.Audit.Denied(r.Context(), audit.Call{Principal: "unauthenticated", Connector: connector, Tool: "-"}, code, msg)
-			writeError(w, status, code, msg)
-			return
 		}
-		if _, ok := g.Capabilities.For(connector); !ok {
-			f.Audit.Denied(r.Context(), audit.Call{Grant: g, Connector: connector, Tool: "-"}, policy.CodeDeniedConnector, "grant does not reach "+connector)
-			writeError(w, http.StatusForbidden, policy.CodeDeniedConnector, "grant does not reach connector "+connector)
-			return
-		}
-		mcpHandler.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), grantKey, g)))
-	})
+		return f.serverFor(r.Context(), endpoint, g, exclude)
+	}, &mcp.StreamableHTTPOptions{SessionTimeout: f.SessionTimeout, Logger: f.Logger, Stateless: f.Stateless})
+	f.handlers[endpoint] = h
+	return h
 }
 
 func (f *Front) authenticate(r *http.Request) (*auth.Grant, string, string) {
@@ -120,45 +174,138 @@ func (f *Front) authenticate(r *http.Request) (*auth.Grant, string, string) {
 	return g, "", ""
 }
 
-// serverFor returns the cached per-grant server for a connector, keyed by grant
-// and policy version so a catalog push produces a fresh tool list.
-func (f *Front) serverFor(ctx context.Context, connector string, g *auth.Grant, ad adapter.Adapter) *mcp.Server {
-	key := connector + "|" + g.ID + "|" + f.Catalog.PolicyVersion()
+// serverFor returns the stable server for (endpoint, grant, exclude), creating and populating it once.
+func (f *Front) serverFor(ctx context.Context, endpoint string, g *auth.Grant, exclude []string) *mcp.Server {
+	sort.Strings(exclude)
+	key := endpoint + "|" + g.ID + "|" + strings.Join(exclude, ",")
 	f.mu.Lock()
 	if f.servers == nil {
-		f.servers = map[string]*mcp.Server{}
+		f.servers = map[string]*liveServer{}
 	}
-	if s, ok := f.servers[key]; ok {
-		f.mu.Unlock()
-		return s
+	ls, ok := f.servers[key]
+	if !ok {
+		name := endpoint
+		if endpoint == AggregateEndpoint {
+			name = "broker"
+		}
+		ls = &liveServer{server: mcp.NewServer(&mcp.Implementation{Name: name, Version: "1"}, &mcp.ServerOptions{Logger: f.Logger}),
+			grant: g, endpoint: endpoint, exclude: map[string]bool{}, toolHash: map[string]string{}, toolOwner: map[string]string{}}
+		for _, e := range exclude {
+			ls.exclude[e] = true
+		}
+		f.servers[key] = ls
 	}
 	f.mu.Unlock()
-
-	tools, err := ad.Tools(ctx, g)
-	if err != nil {
-		f.Logger.Warn("tools unavailable", "connector", connector, "grant", g.ID, "err", err.Error())
-		tools = nil
+	if !ok {
+		f.refreshOne(ctx, ls, true)
 	}
-	server := mcp.NewServer(&mcp.Implementation{Name: connector, Version: "1"}, &mcp.ServerOptions{Logger: f.Logger})
-	for _, t := range tools {
-		schema := withVerbose(t.InputSchema)
-		raw, err := json.Marshal(schema)
+	return ls.server
+}
+
+// Refresh re-derives every live server's tool list from the current registry and catalog and edits it in
+// place. Connectors that are still starting keep the tools they had; removed connectors lose theirs.
+func (f *Front) Refresh(ctx context.Context) {
+	f.mu.Lock()
+	all := make([]*liveServer, 0, len(f.servers))
+	for _, ls := range f.servers {
+		all = append(all, ls)
+	}
+	f.mu.Unlock()
+	for _, ls := range all {
+		f.refreshOne(ctx, ls, false)
+	}
+}
+
+type readiness interface{ Ready() bool }
+
+func (f *Front) refreshOne(ctx context.Context, ls *liveServer, initial bool) {
+	ls.mu.Lock()
+	defer ls.mu.Unlock()
+	var connectors []string
+	if ls.endpoint == AggregateEndpoint {
+		for _, name := range f.Registry.Names() {
+			if ls.exclude[name] {
+				continue
+			}
+			if _, ok := ls.grant.Capabilities.For(name); ok {
+				connectors = append(connectors, name)
+			}
+		}
+	} else {
+		connectors = []string{ls.endpoint}
+	}
+	type def struct {
+		connector, upstream string
+		tool                catalog.Tool
+	}
+	desired := map[string]def{}
+	keep := map[string]bool{} // connectors not ready yet: leave their current tools alone
+	for _, name := range connectors {
+		ad, ok := f.Registry.Lookup(name)
+		if !ok {
+			continue
+		}
+		if r, ok := ad.(readiness); ok && !r.Ready() && !initial {
+			keep[name] = true
+			continue
+		}
+		tools, err := ad.Tools(ctx, ls.grant)
+		if err != nil {
+			f.Logger.Warn("tools unavailable", "connector", name, "grant", ls.grant.ID, "err", err.Error())
+			keep[name] = true
+			continue
+		}
+		for _, t := range tools {
+			exported := t.Name
+			if ls.endpoint == AggregateEndpoint {
+				exported = name + "__" + t.Name
+			}
+			desired[exported] = def{connector: name, upstream: t.Name, tool: t}
+		}
+	}
+	var remove []string
+	for exported, owner := range ls.toolOwner {
+		if _, still := desired[exported]; still || keep[owner] {
+			continue
+		}
+		remove = append(remove, exported)
+	}
+	if len(remove) > 0 {
+		ls.server.RemoveTools(remove...)
+		for _, n := range remove {
+			delete(ls.toolHash, n)
+			delete(ls.toolOwner, n)
+		}
+	}
+	for exported, d := range desired {
+		raw, err := json.Marshal(withVerbose(d.tool.InputSchema))
 		if err != nil {
 			continue
 		}
-		toolName := t.Name
-		server.AddTool(&mcp.Tool{Name: toolName, Description: t.Description, InputSchema: json.RawMessage(raw)},
+		sum := sha256.Sum256(append([]byte(d.tool.Description+"\x00"), raw...))
+		h := hex.EncodeToString(sum[:])
+		if ls.toolHash[exported] == h {
+			continue
+		}
+		connector, upstream := d.connector, d.upstream
+		ls.server.AddTool(&mcp.Tool{Name: exported, Description: d.tool.Description, InputSchema: json.RawMessage(raw)},
 			func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				return f.call(ctx, connector, toolName, ad, req)
+				return f.call(ctx, connector, upstream, req)
 			})
+		ls.toolHash[exported] = h
+		ls.toolOwner[exported] = connector
 	}
+}
+
+// Invalidate drops cached servers for a grant (after revocation), or every server when grantID is empty.
+func (f *Front) Invalidate(grantID string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if s, ok := f.servers[key]; ok {
-		return s
+	for k, ls := range f.servers {
+		if grantID == "" || ls.grant.ID == grantID {
+			delete(f.servers, k)
+		}
 	}
-	f.servers[key] = server
-	return server
 }
 
 // withVerbose adds the one broker-specific argument to a verbatim schema.
@@ -186,7 +333,12 @@ func toolError(code, msg string) *mcp.CallToolResult {
 }
 
 // call is the single tools/call path.
-func (f *Front) call(ctx context.Context, connector, tool string, ad adapter.Adapter, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (f *Front) call(ctx context.Context, connector, tool string, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// The adapter is resolved at call time: a reload may have replaced or removed it.
+	ad, ok := f.Registry.Lookup(connector)
+	if !ok {
+		return toolError("BROKER_UNKNOWN_CONNECTOR", "connector "+connector+" is no longer configured"), nil
+	}
 	// Re-authenticate from the current request header: revocation is checked on every call.
 	var g *auth.Grant
 	if req.Extra != nil && req.Extra.Header != nil {
@@ -293,15 +445,4 @@ func (f *Front) call(ctx context.Context, connector, tool string, ad adapter.Ada
 	_ = f.Audit.Outcome(ctx, callID, base, audit.Outcome{State: state, UpstreamRequestID: res.UpstreamRequestID,
 		OutcomeClass: res.OutcomeClass, Duration: time.Since(started), ResponseBytes: int64(len(raw))})
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(raw)}}}, nil
-}
-
-// Invalidate drops cached servers for a grant (after revocation) or for all when key is empty.
-func (f *Front) Invalidate(grantID string) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	for k := range f.servers {
-		if grantID == "" || strings.Contains(k, "|"+grantID+"|") {
-			delete(f.servers, k)
-		}
-	}
 }

@@ -1,11 +1,10 @@
 # Policy for the stock `mcp-automem` server (tools discovered at runtime). AutoMem has one service token and no
 # tenancy, so namespaces are enforced here: forced tags on store, scoped tags and a response filter on recall,
-# ownership checks on associate. delete_memory and update_memory are never exported to agents or owners
-# through the broker (tools_deny); use the memory service directly for those.
+# ownership checks on associate. update_memory and delete_memory reach owner clients; an agent needs the
+# `update` or `delete` operation explicitly, and its namespace still applies.
 connector: memory
-version: 2
+version: 3
 adapter_version: "2.0"
-tools_deny: [delete_memory, update_memory]
 operations:
   - id: memory.store
     tool: store_memory
@@ -28,6 +27,18 @@ operations:
     requires_capability: operations:store
     constraints: [namespaces, calls_per_run]
     guards: [memory_ownership]       # both memories must carry one of the grant's namespace tags
+  - id: memory.update
+    tool: update_memory
+    risk: reversible
+    requires_capability: operations:update
+    constraints: [namespaces, calls_per_run]
+    guards: [memory_ownership]
+  - id: memory.delete
+    tool: delete_memory
+    risk: sensitive
+    requires_capability: operations:delete
+    constraints: [namespaces, calls_per_run]
+    guards: [memory_ownership, no_bulk_delete]
   - id: memory.health
     tool: check_database_health
     risk: read

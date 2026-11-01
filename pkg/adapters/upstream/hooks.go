@@ -79,6 +79,9 @@ func (a *Adapter) guard(ctx context.Context, s *mcp.ClientSession, name string, 
 		return nil
 	case "single_memory_only":
 		// mcp-automem's batch and supersede modes bypass the per-call namespace and counter checks.
+		if call.Grant != nil && call.Grant.Capabilities.IsOwner() {
+			return nil
+		}
 		for _, k := range []string{"memories", "supersedes_memory_id"} {
 			if _, ok := args[k]; ok {
 				return adapter.Denied(k + " is not permitted through the broker; store one memory per call")
@@ -101,7 +104,11 @@ func (a *Adapter) guard(ctx context.Context, s *mcp.ClientSession, name string, 
 		if len(namespaces) == 0 {
 			return nil
 		}
-		for _, k := range []string{"memory1_id", "memory2_id"} {
+		keys := []string{"memory1_id", "memory2_id"}
+		if call.Tool != "associate_memories" {
+			keys = []string{"memory_id"}
+		}
+		for _, k := range keys {
 			id, _ := args[k].(string)
 			if id == "" {
 				return adapter.Denied(k + " is required")
@@ -116,6 +123,14 @@ func (a *Adapter) guard(ctx context.Context, s *mcp.ClientSession, name string, 
 		}
 		if _, ok := args["associations"]; ok {
 			return adapter.Denied("batch associations are not permitted through the broker")
+		}
+		return nil
+	case "no_bulk_delete":
+		if call.Grant != nil && call.Grant.Capabilities.IsOwner() {
+			return nil
+		}
+		if _, ok := args["tags"]; ok {
+			return adapter.Denied("bulk delete by tag is not permitted through the broker")
 		}
 		return nil
 	}

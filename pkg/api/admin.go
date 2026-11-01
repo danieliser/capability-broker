@@ -21,6 +21,7 @@ import (
 	"github.com/danieliser/capability-broker/pkg/buildinfo"
 	"github.com/danieliser/capability-broker/pkg/catalog"
 	"github.com/danieliser/capability-broker/pkg/mcpfront"
+	"github.com/danieliser/capability-broker/pkg/registry"
 )
 
 type Admin struct {
@@ -29,7 +30,9 @@ type Admin struct {
 	Catalog  *catalog.Catalog
 	Audit    *audit.Writer
 	Front    *mcpfront.Front
-	Adapters map[string]adapter.Adapter
+	Registry *registry.Registry
+	// Reload re-reads connectors.yaml, secrets.json and catalog.d and applies the difference.
+	Reload   func(ctx context.Context) (map[string]any, error)
 	DB       *sql.DB
 	FrontURL string // http://127.0.0.1:8890
 	Started  time.Time
@@ -67,12 +70,13 @@ func (a *Admin) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/catalog/queries", a.auth(a.pushQueries))
 	mux.HandleFunc("GET /v1/catalog/queries", a.auth(a.listQueries))
 	mux.HandleFunc("GET /v1/receipts", a.auth(a.receipts))
+	mux.HandleFunc("POST /v1/reload", a.auth(a.reload))
 	return mux
 }
 
 func (a *Admin) status(w http.ResponseWriter, r *http.Request) {
 	health := map[string]string{}
-	for name, ad := range a.Adapters {
+	for name, ad := range a.Registry.Snapshot() {
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		if err := ad.Health(ctx); err != nil {
 			health[name] = "degraded: " + adapter.Truncate(err.Error(), 120)
@@ -127,7 +131,7 @@ func (a *Admin) mintGrant(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		for _, name := range c.Connectors() {
-			if _, ok := a.Adapters[name]; !ok {
+			if _, ok := a.Registry.Lookup(name); !ok {
 				writeErr(w, http.StatusBadRequest, "ADMIN_BAD_CAPABILITIES", "unknown connector "+name)
 				return
 			}
@@ -156,13 +160,14 @@ func (a *Admin) mintGrant(w http.ResponseWriter, r *http.Request) {
 	servers := map[string]string{}
 	connectors := caps.Connectors()
 	if caps.IsOwner() {
-		for name := range a.Adapters {
+		for _, name := range a.Registry.Names() {
 			connectors = append(connectors, name)
 		}
 	}
 	for _, name := range connectors {
 		servers[name] = a.FrontURL + "/mcp/" + name
 	}
+	servers["broker"] = a.FrontURL + "/mcp"
 	writeJSON(w, http.StatusCreated, mintResponse{GrantID: g.ID, Token: token, ExpiresAt: g.ExpiresAt, Servers: servers})
 }
 
@@ -254,6 +259,19 @@ func (a *Admin) listQueries(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"overlays": out, "policy_version": a.Catalog.PolicyVersion()})
+}
+
+func (a *Admin) reload(w http.ResponseWriter, r *http.Request) {
+	if a.Reload == nil {
+		writeErr(w, http.StatusNotImplemented, "ADMIN_NO_RELOAD", "reload is not wired")
+		return
+	}
+	out, err := a.Reload(r.Context())
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "ADMIN_RELOAD_FAILED", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (a *Admin) receipts(w http.ResponseWriter, r *http.Request) {

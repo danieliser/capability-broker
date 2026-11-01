@@ -46,6 +46,17 @@ func runSubcommand(name string, args []string) int {
 		}
 		printJSON(out)
 		return 0
+	case "reload":
+		c, _, err := adminClient()
+		if err != nil {
+			return fail("%v", err)
+		}
+		var out map[string]any
+		if err := c.Do(ctx, "POST", "/v1/reload", nil, &out); err != nil {
+			return fail("%v", err)
+		}
+		printJSON(out)
+		return 0
 	case "client":
 		return runClient(ctx, args)
 	case "grant":

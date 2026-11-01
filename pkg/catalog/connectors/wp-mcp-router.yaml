@@ -1,8 +1,8 @@
-# Policy for `wp-mcp-router` (tools discovered at runtime). wp_run_across is never exported.
+# Policy for `wp-mcp-router` (tools discovered at runtime). wp_run_across (fan-out to many sites) reaches
+# owner clients; an agent needs the `run_across` operation explicitly.
 connector: wp-mcp-router
-version: 2
+version: 3
 adapter_version: "2.0"
-tools_deny: [wp_run_across]
 tool_transforms: [narrow_site_enum]   # the `site` enum shows only the grant's sites
 site_hosts_tool: wp_list_sites        # learned at connect time for URL policy
 operations:
@@ -25,6 +25,11 @@ operations:
     guards: [force_draft_status, compact_request]
     response: [site_result]
     compact: { fields: [id, status, type, title, link, modified, slug] }
+  - id: wordpress.run_across
+    tool: wp_run_across
+    risk: sensitive
+    requires_capability: operations:run_across
+    constraints: [calls_per_run]
   - id: wordpress.site.read
     tool: wp_list_sites
     risk: read

@@ -189,7 +189,10 @@ func (c *Catalog) Ensure(name string, toolNames []string) *Connector {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if conn, ok := c.connectors[name]; ok {
-		return conn
+		// A synthesized catalog follows the child's tool set; written catalogs never change here.
+		if conn.Source != "synthesized" || len(toolNames) == 0 || sameTools(conn, toolNames) {
+			return conn
+		}
 	}
 	conn := &Connector{Connector: name, Version: 1, AdapterVersion: "synth", Source: "synthesized"}
 	for _, t := range toolNames {
@@ -203,6 +206,42 @@ func (c *Catalog) Ensure(name string, toolNames []string) *Connector {
 	conn.digest = hex.EncodeToString(sum[:8])
 	c.connectors[name] = conn
 	return conn
+}
+
+func sameTools(conn *Connector, names []string) bool {
+	if len(conn.Operations) != len(names) {
+		return false
+	}
+	have := map[string]bool{}
+	for _, op := range conn.Operations {
+		have[op.Tool] = true
+	}
+	for _, n := range names {
+		if !have[n] {
+			return false
+		}
+	}
+	return true
+}
+
+// Reload re-reads the embedded catalogs and the overlay directory. Pushed named queries and synthesized
+// catalogs for connectors that have no written catalog are kept. A broken overlay leaves the catalog as it was.
+func (c *Catalog) Reload() error {
+	fresh, err := Load(c.overlayDir)
+	if err != nil {
+		return err
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for name, conn := range c.connectors {
+		if conn.Source == "synthesized" {
+			if _, written := fresh.connectors[name]; !written {
+				fresh.connectors[name] = conn
+			}
+		}
+	}
+	c.connectors = fresh.connectors
+	return nil
 }
 
 func (c *Catalog) Connector(name string) (*Connector, bool) {

@@ -150,10 +150,12 @@ func TestMemoryNamespaceFilterAndDeniedTools(t *testing.T) {
 	}
 	owner := &auth.Grant{ID: "o", Kind: auth.KindClient, Capabilities: auth.OwnerCapabilities()}
 	tools, _ = a.Tools(context.Background(), owner)
+	ownerHas := map[string]bool{}
 	for _, tl := range tools {
-		if tl.Name == "delete_memory" || tl.Name == "update_memory" {
-			t.Fatal("denied tool exported to owner")
-		}
+		ownerHas[tl.Name] = true
+	}
+	if !ownerHas["delete_memory"] || !ownerHas["update_memory"] {
+		t.Fatal("owner should reach update_memory and delete_memory")
 	}
 	res, err := run(t, a, cat, g, "recall_memory", map[string]any{"query": "q"}, false)
 	if err != nil {

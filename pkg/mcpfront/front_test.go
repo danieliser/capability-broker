@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/danieliser/capability-broker/pkg/auth"
 	"github.com/danieliser/capability-broker/pkg/catalog"
 	"github.com/danieliser/capability-broker/pkg/durable"
+	"github.com/danieliser/capability-broker/pkg/registry"
 )
 
 // fakeCH answers named queries without ClickHouse, recording what it saw.
@@ -41,7 +43,11 @@ func (f *fakeCH) Tools(_ context.Context, g *auth.Grant) ([]catalog.Tool, error)
 }
 func (f *fakeCH) Execute(_ context.Context, c adapter.Call) (*adapter.Result, error) {
 	f.calls = append(f.calls, c)
-	return &adapter.Result{Compact: map[string]any{"rows": 1, "query": c.Decision.Query.ID}, Verbose: map[string]any{"rows": 1, "data": [][]any{{1}}},
+	qid := ""
+	if c.Decision.Query != nil {
+		qid = c.Decision.Query.ID
+	}
+	return &adapter.Result{Compact: map[string]any{"rows": 1, "query": qid}, Verbose: map[string]any{"rows": 1, "data": [][]any{{1}}},
 		Outcome: adapter.OutcomeCompleted, UpstreamRequestID: "q-1", OutcomeClass: "ok"}, nil
 }
 func (f *fakeCH) Health(context.Context) error { return nil }
@@ -68,11 +74,14 @@ func newHarness(t *testing.T) *harness {
 		t.Fatal(err)
 	}
 	fake := &fakeCH{cat: cat}
-	f := &Front{Store: auth.NewStore(db), Catalog: cat, Audit: audit.NewWriter(db), Adapters: map[string]adapter.Adapter{"clickhouse": fake, "memory": fake},
+	reg := registry.New()
+	reg.Set("clickhouse", fake)
+	reg.Set("memory", fake)
+	f := &Front{Store: auth.NewStore(db), Catalog: cat, Audit: audit.NewWriter(db), Registry: reg,
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Stateless: statelessMode}
 	mux := http.NewServeMux()
-	mux.Handle("/mcp/clickhouse", f.Handler("clickhouse"))
-	mux.Handle("/mcp/memory", f.Handler("memory"))
+	mux.HandleFunc("/mcp/{connector}", func(w http.ResponseWriter, r *http.Request) { f.ServeConnector(w, r, r.PathValue("connector")) })
+	mux.HandleFunc("/mcp", f.ServeAggregate)
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	return &harness{srv: srv, store: f.Store, audit: f.Audit, front: f, fake: fake}
@@ -233,4 +242,72 @@ func TestLegacyStatefulModeStillWorks(t *testing.T) {
 	defer func() { statelessMode = true }()
 	TestAgentSeesOnlyGrantedToolsAndCanRunNamedQuery(t)
 	TestRevokeMidSession(t)
+}
+
+// renamedFake serves the same fake tools under another connector name.
+type renamedFake struct {
+	*fakeCH
+	name string
+}
+
+func (r renamedFake) Connector() string { return r.name }
+
+func TestHotAddedConnectorAppearsOnTheAggregateWithoutReconnecting(t *testing.T) {
+	for _, stateless := range []bool{false, true} {
+		statelessMode = stateless
+		h := newHarness(t)
+		statelessMode = true
+		_, tok, err := h.store.Mint(context.Background(), auth.MintRequest{Kind: auth.KindClient, Name: "cc", Capabilities: auth.OwnerCapabilities(), IssuedBy: "t"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		changed := make(chan struct{}, 4)
+		client := mcp.NewClient(&mcp.Implementation{Name: "t", Version: "0"}, &mcp.ClientOptions{
+			ToolListChangedHandler: func(context.Context, *mcp.ToolListChangedRequest) { changed <- struct{}{} },
+		})
+		s, err := client.Connect(context.Background(), &mcp.StreamableClientTransport{Endpoint: h.srv.URL + "/mcp?exclude=memory", MaxRetries: -1,
+			HTTPClient: &http.Client{Transport: &bearerRT{token: tok, next: http.DefaultTransport}}}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { s.Close() })
+		names := func() []string {
+			res, err := s.ListTools(context.Background(), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var out []string
+			for _, tl := range res.Tools {
+				out = append(out, tl.Name)
+			}
+			sort.Strings(out)
+			return out
+		}
+		if got := strings.Join(names(), ","); got != "clickhouse__list_databases,clickhouse__list_tables,clickhouse__run_query" {
+			t.Fatalf("stateless=%v initial aggregate tools: %s", stateless, got)
+		}
+		h.front.Catalog.Ensure("extra", []string{"run_query", "list_databases", "list_tables"}) // synthesized: owner reaches every tool
+		h.front.Registry.Set("extra", renamedFake{h.fake, "extra"})
+		h.front.Refresh(context.Background())
+		if !stateless {
+			select {
+			case <-changed:
+			case <-time.After(3 * time.Second):
+				t.Fatal("no tools/list_changed after a connector was added")
+			}
+		}
+		if got := strings.Join(names(), ","); !strings.Contains(got, "extra__run_query") {
+			t.Fatalf("stateless=%v hot-added connector missing: %s", stateless, got)
+		}
+		res, err := s.CallTool(context.Background(), &mcp.CallToolParams{Name: "extra__run_query", Arguments: map[string]any{"query": "@scheduler.freshness"}})
+		if err != nil || res.IsError {
+			t.Fatalf("call through hot-added connector: %v %s", err, text(res))
+		}
+		h.front.Registry.Remove("extra")
+		h.front.Refresh(context.Background())
+		if got := strings.Join(names(), ","); strings.Contains(got, "extra__") {
+			t.Fatalf("removed connector still listed: %s", got)
+		}
+		s.Close()
+	}
 }

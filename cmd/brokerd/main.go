@@ -19,23 +19,22 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/danieliser/capability-broker/pkg/adapter"
-	"github.com/danieliser/capability-broker/pkg/adapters/upstream"
 	"github.com/danieliser/capability-broker/pkg/api"
 	"github.com/danieliser/capability-broker/pkg/audit"
 	"github.com/danieliser/capability-broker/pkg/auth"
 	"github.com/danieliser/capability-broker/pkg/buildinfo"
 	"github.com/danieliser/capability-broker/pkg/catalog"
 	"github.com/danieliser/capability-broker/pkg/config"
-	"github.com/danieliser/capability-broker/pkg/connectors"
 	"github.com/danieliser/capability-broker/pkg/durable"
 	"github.com/danieliser/capability-broker/pkg/mcpfront"
+	"github.com/danieliser/capability-broker/pkg/registry"
+	"github.com/danieliser/capability-broker/pkg/reload"
 )
 
 func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
-		case "client", "grant", "queries", "receipts", "status":
+		case "client", "grant", "queries", "receipts", "status", "reload":
 			os.Exit(runSubcommand(os.Args[1], os.Args[2:]))
 		}
 	}
@@ -104,41 +103,54 @@ func run(cfg config.Config, stateless bool) error {
 	} else if n > 0 {
 		logger.Info("named-query overlays restored", "projects", n)
 	}
-	specs, err := connectors.Load(cfg.ConnectorsPath(), cfg.Secrets)
-	if err != nil {
-		return err
-	}
-	if len(specs) == 0 {
-		logger.Warn("no connectors configured; copy connectors.example.yaml to the data dir", "path", cfg.ConnectorsPath())
-	}
-
 	store := auth.NewStore(db)
 	writer := audit.NewWriter(db)
-	adapters := map[string]adapter.Adapter{}
-	var ups []*upstream.Adapter
-	for _, spec := range specs {
-		ad := upstream.New(spec, cat, func(msg string, kv ...any) { logger.Info(msg, kv...) })
-		adapters[spec.Name] = ad
-		ups = append(ups, ad)
+	reg := registry.New()
+	front := &mcpfront.Front{Store: store, Catalog: cat, Audit: writer, Registry: reg, Logger: logger, SessionTimeout: 30 * time.Minute, Stateless: stateless}
+	reloader := &reload.Reloader{Config: cfg, Catalog: cat, Registry: reg, Front: front, Base: ctx,
+		Log: func(msg string, kv ...any) { logger.Info(msg, kv...) }}
+	if res, err := reloader.Apply(ctx); err != nil {
+		return fmt.Errorf("initial load: %w", err)
+	} else if len(res.Added) == 0 {
+		logger.Warn("no connectors configured; copy connectors.example.yaml to the data dir", "path", cfg.ConnectorsPath())
 	}
-	for _, ad := range ups {
-		ad := ad
-		go func() {
-			if err := ad.Start(ctx); err != nil {
-				logger.Warn("connector not started; degraded until first successful call", "connector", ad.Connector(), "err", err.Error())
+	defer func() {
+		for _, ad := range reg.Snapshot() {
+			if c, ok := ad.(interface{ Close() error }); ok {
+				_ = c.Close()
 			}
-		}()
-		defer ad.Close()
-	}
-	front := &mcpfront.Front{Store: store, Catalog: cat, Audit: writer, Adapters: adapters, Logger: logger, SessionTimeout: 30 * time.Minute, Stateless: stateless}
-	names := make([]string, 0, len(adapters))
-	for name := range adapters {
-		names = append(names, name)
-	}
+		}
+	}()
+	// Hot reload: poll the data-root files, and apply on SIGHUP too.
+	go reloader.Watch(ctx, 2*time.Second)
+	hup := make(chan os.Signal, 1)
+	signal.Notify(hup, syscall.SIGHUP)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-hup:
+				if _, err := reloader.Apply(ctx); err != nil {
+					logger.Warn("reload refused; keeping the last good state", "err", err.Error())
+				}
+			}
+		}
+	}()
 
-	frontSrv := &http.Server{Addr: cfg.FrontAddr(), Handler: api.FrontHandler(front, names), ReadHeaderTimeout: 10 * time.Second}
-	admin := &api.Admin{Token: adminToken, Store: store, Catalog: cat, Audit: writer, Front: front, Adapters: adapters, DB: db,
-		FrontURL: "http://" + cfg.FrontAddr(), Started: time.Now()}
+	frontSrv := &http.Server{Addr: cfg.FrontAddr(), Handler: api.FrontHandler(front), ReadHeaderTimeout: 10 * time.Second}
+	admin := &api.Admin{Token: adminToken, Store: store, Catalog: cat, Audit: writer, Front: front, Registry: reg, DB: db,
+		FrontURL: "http://" + cfg.FrontAddr(), Started: time.Now(),
+		Reload: func(ctx context.Context) (map[string]any, error) {
+			res, err := reloader.Apply(ctx)
+			if err != nil {
+				return nil, err
+			}
+			b, _ := json.Marshal(res)
+			var out map[string]any
+			_ = json.Unmarshal(b, &out)
+			return out, nil
+		}}
 	_ = os.Remove(cfg.AdminSocketPath())
 	ln, err := net.Listen("unix", cfg.AdminSocketPath())
 	if err != nil {
@@ -149,7 +161,7 @@ func run(cfg config.Config, stateless bool) error {
 
 	errCh := make(chan error, 2)
 	go func() {
-		logger.Info("front listening", "addr", cfg.FrontAddr(), "connectors", names, "stateless", stateless)
+		logger.Info("front listening", "addr", cfg.FrontAddr(), "connectors", reg.Names(), "stateless", stateless)
 		if err := frontSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- fmt.Errorf("front: %w", err)
 		}
