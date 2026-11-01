@@ -189,12 +189,15 @@ func (a *Adapter) dropSession() {
 	}
 }
 
+// Health lists tools rather than pinging: some upstreams (FastMCP) reject a ping whose _meta lacks
+// the newest protocol fields, and tools/list is what every call depends on anyway.
 func (a *Adapter) Health(ctx context.Context) error {
 	s, _, err := a.ensure(ctx)
 	if err != nil {
 		return err
 	}
-	return s.Ping(ctx, nil)
+	_, err = s.ListTools(ctx, &mcp.ListToolsParams{})
+	return err
 }
 
 // Tools returns the exported upstream tools this grant can reach: not denied by
