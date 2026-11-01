@@ -1,8 +1,10 @@
+# Policy for `wp-mcp-router` (tools discovered at runtime). wp_run_across is never exported.
 connector: wp-mcp-router
-version: 1
-adapter_version: "1.0"
-tools_from_upstream: true
-tools_allow: [wp_list_sites, wp_search_abilities, wp_get_ability, wp_run, wp_get_content_by_url]
+version: 2
+adapter_version: "2.0"
+tools_deny: [wp_run_across]
+tool_transforms: [narrow_site_enum]   # the `site` enum shows only the grant's sites
+site_hosts_tool: wp_list_sites        # learned at connect time for URL policy
 operations:
   # Specific wp_run operations first: the ability name selects the operation.
   - id: wordpress.content.read
@@ -11,6 +13,8 @@ operations:
     risk: read
     requires_capability: operations:content.read
     constraints: [sites, calls_per_run]
+    guards: [compact_request]
+    response: [site_result]
     compact: { fields: [id, status, type, title, link, modified, date, slug] }
   - id: wordpress.content.draft
     tool: wp_run
@@ -18,7 +22,8 @@ operations:
     risk: reversible
     requires_capability: operations:content.draft
     constraints: [sites, post_types, max_drafts_per_run, calls_per_run]
-    guards: [force_draft_status]
+    guards: [force_draft_status, compact_request]
+    response: [site_result]
     compact: { fields: [id, status, type, title, link, modified, slug] }
   - id: wordpress.site.read
     tool: wp_list_sites
@@ -40,4 +45,5 @@ operations:
     risk: read
     requires_capability: operations:content.read
     constraints: [sites_url, calls_per_run]
+    response: [site_result]
     compact: { fields: [id, status, type, title, link, modified, date, slug, site] }

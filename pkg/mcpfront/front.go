@@ -28,7 +28,7 @@ type ctxKey int
 
 const grantKey ctxKey = 1
 
-// SiteHostSource lets the WordPress adapter feed hostnames into policy.
+// SiteHostSource is implemented by adapters that learn site id → hostname (URL policy).
 type SiteHostSource interface{ SiteHosts() map[string]string }
 
 type Front struct {
@@ -36,7 +36,6 @@ type Front struct {
 	Catalog  *catalog.Catalog
 	Audit    *audit.Writer
 	Adapters map[string]adapter.Adapter
-	Sites    SiteHostSource
 	Logger   *slog.Logger
 	// SessionTimeout closes idle MCP sessions (legacy stateful mode); zero keeps them.
 	SessionTimeout time.Duration
@@ -239,8 +238,8 @@ func (f *Front) call(ctx context.Context, connector, tool string, ad adapter.Ada
 	base.Operation = op.ID
 
 	env := policy.Env{Catalog: f.Catalog}
-	if f.Sites != nil {
-		env.SiteHosts = f.Sites.SiteHosts()
+	if src, ok := ad.(SiteHostSource); ok {
+		env.SiteHosts = src.SiteHosts()
 	}
 	decision, err := policy.Evaluate(ctx, g, connector, op, args, env, f.Store)
 	if err != nil {
@@ -260,7 +259,12 @@ func (f *Front) call(ctx context.Context, connector, tool string, ad adapter.Ada
 		return toolError("BROKER_AUDIT_UNAVAILABLE", "the broker cannot record this call and refuses to run it"), nil
 	}
 	started := time.Now()
-	res, err := ad.Execute(ctx, adapter.Call{Grant: g, Op: op, Tool: tool, Decision: decision, Verbose: verbose, IdempotencyKey: idem})
+	var progressToken any
+	if req.Params != nil && req.Params.Meta != nil {
+		progressToken = req.Params.Meta["progressToken"]
+	}
+	res, err := ad.Execute(ctx, adapter.Call{Grant: g, Op: op, Tool: tool, Decision: decision, Verbose: verbose, IdempotencyKey: idem,
+		CallID: callID, Session: req.Session, ProgressToken: progressToken})
 	if err != nil {
 		ue, ok := adapter.AsUpstream(err)
 		code, msg, state := adapter.CodeUpstreamError, "upstream call failed", audit.StateFailed

@@ -1,7 +1,7 @@
 // brokerd is the capability broker daemon: one always-on process that holds the
-// upstream credentials, exposes each connector as an ordinary MCP server on
-// loopback, and enforces per-grant policy with receipts. Subcommands (client,
-// grant, queries, receipts, status) talk to the running daemon's admin socket.
+// upstream credentials, hosts any stdio MCP server declared in connectors.yaml,
+// exposes each as an ordinary MCP server on loopback, and enforces per-grant
+// policy with receipts. Subcommands talk to the running daemon's admin socket.
 package main
 
 import (
@@ -20,15 +20,14 @@ import (
 	"time"
 
 	"github.com/danieliser/capability-broker/pkg/adapter"
-	"github.com/danieliser/capability-broker/pkg/adapters/clickhouse"
-	"github.com/danieliser/capability-broker/pkg/adapters/memory"
-	"github.com/danieliser/capability-broker/pkg/adapters/wordpress"
+	"github.com/danieliser/capability-broker/pkg/adapters/upstream"
 	"github.com/danieliser/capability-broker/pkg/api"
 	"github.com/danieliser/capability-broker/pkg/audit"
 	"github.com/danieliser/capability-broker/pkg/auth"
 	"github.com/danieliser/capability-broker/pkg/buildinfo"
 	"github.com/danieliser/capability-broker/pkg/catalog"
 	"github.com/danieliser/capability-broker/pkg/config"
+	"github.com/danieliser/capability-broker/pkg/connectors"
 	"github.com/danieliser/capability-broker/pkg/durable"
 	"github.com/danieliser/capability-broker/pkg/mcpfront"
 )
@@ -46,9 +45,8 @@ func main() {
 	requireBuild := flag.String("require-build", "", "Require exact version@commit identity and exit")
 	flag.StringVar(&cfg.Host, "host", cfg.Host, "Front bind address (loopback only)")
 	flag.IntVar(&cfg.Port, "port", cfg.Port, "Front port")
-	flag.StringVar(&cfg.DataDir, "data-dir", cfg.DataDir, "Data root (database, admin socket, admin token, secrets)")
-	noWP := flag.Bool("no-wordpress", false, "Do not start the wp-mcp-router child")
-	stateless := flag.Bool("stateless", true, "Serve sessionless Streamable HTTP (MCP 2026-07-28); --stateless=false keeps Mcp-Session-Id sessions for older clients")
+	flag.StringVar(&cfg.DataDir, "data-dir", cfg.DataDir, "Data root (database, admin socket, admin token, secrets, connectors.yaml, catalog.d)")
+	stateless := flag.Bool("stateless", true, "Serve sessionless Streamable HTTP (MCP 2026-07-28); --stateless=false keeps Mcp-Session-Id sessions, which sampling and elicitation relay need")
 	flag.Parse()
 
 	id := buildinfo.Current()
@@ -70,12 +68,12 @@ func main() {
 	if ip := net.ParseIP(cfg.Host); ip == nil || !ip.IsLoopback() {
 		log.Fatalf("front host must be a loopback address, got %q", cfg.Host)
 	}
-	if err := run(cfg, *noWP, *stateless); err != nil {
+	if err := run(cfg, *stateless); err != nil {
 		log.Fatalf("brokerd: %v", err)
 	}
 }
 
-func run(cfg config.Config, noWP bool, stateless bool) error {
+func run(cfg config.Config, stateless bool) error {
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	logger.Info("brokerd starting", "version", buildinfo.Version, "commit", buildinfo.Commit, "data_dir", cfg.DataDir)
 	if err := os.MkdirAll(cfg.DataDir, 0o700); err != nil {
@@ -97,43 +95,48 @@ func run(cfg config.Config, noWP bool, stateless bool) error {
 		return err
 	}
 	defer db.Close()
-	cat, err := catalog.Load()
+	cat, err := catalog.Load(cfg.CatalogDir())
 	if err != nil {
 		return err
 	}
 	if n, err := api.RestoreOverlays(ctx, db, cat); err != nil {
 		return fmt.Errorf("restore catalog overlays: %w", err)
 	} else if n > 0 {
-		logger.Info("catalog overlays restored", "projects", n)
+		logger.Info("named-query overlays restored", "projects", n)
+	}
+	specs, err := connectors.Load(cfg.ConnectorsPath(), cfg.Secrets)
+	if err != nil {
+		return err
+	}
+	if len(specs) == 0 {
+		logger.Warn("no connectors configured; copy connectors.example.yaml to the data dir", "path", cfg.ConnectorsPath())
 	}
 
 	store := auth.NewStore(db)
 	writer := audit.NewWriter(db)
-	adapters := map[string]adapter.Adapter{
-		"clickhouse": clickhouse.New(cfg.ClickHouse, cfg.Secrets.ClickHousePassword, cat),
-		"memory":     memory.New(cfg.Memory, cfg.Secrets.AutoMemAPIKey, cat),
+	adapters := map[string]adapter.Adapter{}
+	var ups []*upstream.Adapter
+	for _, spec := range specs {
+		ad := upstream.New(spec, cat, func(msg string, kv ...any) { logger.Info(msg, kv...) })
+		adapters[spec.Name] = ad
+		ups = append(ups, ad)
 	}
-	var sites mcpfront.SiteHostSource
-	if !noWP {
-		wp := wordpress.New(cfg.WordPress, cat)
-		adapters["wp-mcp-router"] = wp
-		sites = wp
+	for _, ad := range ups {
+		ad := ad
 		go func() {
-			if err := wp.Start(ctx); err != nil {
-				logger.Warn("wp-mcp-router not started; connector degraded until first successful call", "err", err.Error())
-			} else {
-				logger.Info("wp-mcp-router child connected")
+			if err := ad.Start(ctx); err != nil {
+				logger.Warn("connector not started; degraded until first successful call", "connector", ad.Connector(), "err", err.Error())
 			}
 		}()
-		defer wp.Close()
+		defer ad.Close()
 	}
-	front := &mcpfront.Front{Store: store, Catalog: cat, Audit: writer, Adapters: adapters, Sites: sites, Logger: logger, SessionTimeout: 30 * time.Minute, Stateless: stateless}
-	connectors := make([]string, 0, len(adapters))
+	front := &mcpfront.Front{Store: store, Catalog: cat, Audit: writer, Adapters: adapters, Logger: logger, SessionTimeout: 30 * time.Minute, Stateless: stateless}
+	names := make([]string, 0, len(adapters))
 	for name := range adapters {
-		connectors = append(connectors, name)
+		names = append(names, name)
 	}
 
-	frontSrv := &http.Server{Addr: cfg.FrontAddr(), Handler: api.FrontHandler(front, connectors), ReadHeaderTimeout: 10 * time.Second}
+	frontSrv := &http.Server{Addr: cfg.FrontAddr(), Handler: api.FrontHandler(front, names), ReadHeaderTimeout: 10 * time.Second}
 	admin := &api.Admin{Token: adminToken, Store: store, Catalog: cat, Audit: writer, Front: front, Adapters: adapters, DB: db,
 		FrontURL: "http://" + cfg.FrontAddr(), Started: time.Now()}
 	_ = os.Remove(cfg.AdminSocketPath())
@@ -146,7 +149,7 @@ func run(cfg config.Config, noWP bool, stateless bool) error {
 
 	errCh := make(chan error, 2)
 	go func() {
-		logger.Info("front listening", "addr", cfg.FrontAddr(), "connectors", connectors, "stateless", stateless)
+		logger.Info("front listening", "addr", cfg.FrontAddr(), "connectors", names, "stateless", stateless)
 		if err := frontSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- fmt.Errorf("front: %w", err)
 		}

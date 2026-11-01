@@ -1,0 +1,32 @@
+# brokerd connectors: every stdio MCP server the broker hosts. Copy to ~/.brokerd/connectors.yaml.
+#
+# Tools are discovered from each child at startup and exported verbatim at /mcp/<name>.
+# Policy comes from the connector's catalog: ~/.brokerd/catalog.d/<name>.yaml if present, otherwise the
+# catalog embedded in brokerd for that name (clickhouse, wp-mcp-router, memory), otherwise a synthesized
+# one in which every tool is an operation of its own name that an agent grant must list under `operations`.
+# Env values may reference ${secret:key} (from ~/.brokerd/secrets.json) and ${env:NAME}; the child never
+# sees anything else from the broker's environment.
+connectors:
+  clickhouse:
+    command: uvx
+    args: [--from, mcp-clickhouse, mcp-clickhouse]
+    env:
+      CLICKHOUSE_HOST: localhost
+      CLICKHOUSE_PORT: "18123"
+      CLICKHOUSE_USER: broker_reader
+      CLICKHOUSE_PASSWORD: "${secret:clickhouse_password}"
+      CLICKHOUSE_DATABASE: companykit
+      CLICKHOUSE_SECURE: "false"
+      CLICKHOUSE_VERIFY: "false"
+    startup_timeout: 120s
+  memory:
+    command: ~/.local/share/mcp-clients/node_modules/.bin/mcp-automem
+    env:
+      AUTOMEM_API_URL: https://memory-service.up.railway.app
+      AUTOMEM_API_KEY: "${secret:automem_api_key}"
+  wp-mcp-router:
+    command: npx
+    args: [-y, wp-mcp-router@latest]
+    env:
+      WP_MCP_ROUTER_CONFIG: ~/.config/wp-mcp-router/sites.json
+    startup_timeout: 120s

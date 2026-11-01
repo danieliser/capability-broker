@@ -24,7 +24,7 @@ func setup(t *testing.T) fixture {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	cat, err := catalog.Load()
+	cat, err := catalog.Load("")
 	if err != nil {
 		t.Fatal(err)
 	}

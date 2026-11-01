@@ -20,8 +20,12 @@ if [ -n "$(git -C "$SCRIPT_DIR" status --porcelain)" ] && [ "${ALLOW_DIRTY:-0}" 
   echo "error: working tree is dirty; commit first or set ALLOW_DIRTY=1"; exit 1
 fi
 
-mkdir -p "$BIN_DIR" "$DATA_DIR" "$LOG_DIR"
+mkdir -p "$BIN_DIR" "$DATA_DIR" "$DATA_DIR/catalog.d" "$LOG_DIR"
 chmod 700 "$DATA_DIR"
+if [ ! -f "$DATA_DIR/connectors.yaml" ]; then
+  cp "$SCRIPT_DIR/connectors.example.yaml" "$DATA_DIR/connectors.yaml" && chmod 600 "$DATA_DIR/connectors.yaml"
+  echo "wrote $DATA_DIR/connectors.yaml from the example; edit it for your upstreams"
+fi
 
 echo "building brokerd ${VERSION}@${COMMIT}"
 ( cd "$SCRIPT_DIR" && go build -trimpath \

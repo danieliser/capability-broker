@@ -29,14 +29,13 @@ type fakeCH struct {
 
 func (f *fakeCH) Connector() string { return "clickhouse" }
 func (f *fakeCH) Tools(_ context.Context, g *auth.Grant) ([]catalog.Tool, error) {
-	conn, _ := f.cat.Connector("clickhouse")
 	cap, _ := g.Capabilities.For("clickhouse")
 	var out []catalog.Tool
-	for _, t := range conn.Tools {
-		if !g.Capabilities.IsOwner() && cap.SQL != "select" && t.Name != "run_query" {
+	for _, name := range []string{"run_query", "list_databases", "list_tables"} {
+		if !g.Capabilities.IsOwner() && cap.SQL != "select" && name != "run_query" {
 			continue
 		}
-		out = append(out, t)
+		out = append(out, catalog.Tool{Name: name, Description: name, InputSchema: map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string"}}}})
 	}
 	return out, nil
 }
@@ -64,7 +63,7 @@ func newHarness(t *testing.T) *harness {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	cat, _ := catalog.Load()
+	cat, _ := catalog.Load("")
 	if _, err := cat.PushQueries("companykit", []byte("queries:\n  - id: scheduler.freshness\n    sql: SELECT {since:DateTime}\n    params: { since: { type: DateTime } }\n")); err != nil {
 		t.Fatal(err)
 	}

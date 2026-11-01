@@ -1,15 +1,19 @@
-// Package catalog holds the operation catalog: per connector, the verbatim
-// upstream tools the broker exposes and the operations (policy keys) each tool
-// call resolves to. Named queries are a pushed overlay keyed by project.
+// Package catalog holds the operation catalog: per connector, which upstream
+// tools pass through and the operations (policy keys) each tool call resolves
+// to. Tools themselves come from the upstream server at runtime; the catalog
+// never carries schemas. Sources, in order: <data-dir>/catalog.d/<name>.yaml,
+// the embedded catalog of the same name, or a synthesized one (every tool is an
+// operation of its own name). Named queries are a pushed overlay keyed by project.
 package catalog
 
 import (
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io/fs"
+	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -31,9 +35,9 @@ const (
 
 // Tool is an upstream tool definition passed through verbatim.
 type Tool struct {
-	Name        string         `yaml:"name" json:"name"`
-	Description string         `yaml:"description" json:"description"`
-	InputSchema map[string]any `yaml:"inputSchema" json:"inputSchema"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	InputSchema map[string]any `json:"inputSchema"`
 }
 
 // Operation is the stable policy key a (tool, argument pattern) resolves to.
@@ -43,24 +47,27 @@ type Operation struct {
 	Match              map[string]string `yaml:"match,omitempty"` // argument name → regex; all must match
 	Risk               Risk              `yaml:"risk"`
 	RequiresCapability string            `yaml:"requires_capability,omitempty"` // "sql.select" or "operations:<name>"
-	Constraints        []string          `yaml:"constraints,omitempty"`         // policy check names
-	Guards             []string          `yaml:"guards,omitempty"`              // adapter-side argument guards
+	Constraints        []string          `yaml:"constraints,omitempty"`         // policy check names (pkg/policy)
+	Guards             []string          `yaml:"guards,omitempty"`              // request hooks (pkg/adapters/upstream)
+	Response           []string          `yaml:"response,omitempty"`            // response hooks (pkg/adapters/upstream)
 	Approval           string            `yaml:"approval,omitempty"`            // "exact_action" for P2 operations
-	Compact            map[string]any    `yaml:"compact,omitempty"`
+	Compact            map[string]any    `yaml:"compact,omitempty"`             // fields: [...] | max_items | max_string
 	Description        string            `yaml:"description,omitempty"`
 
 	compiled map[string]*regexp.Regexp
 }
 
 type Connector struct {
-	Connector         string       `yaml:"connector"`
-	Version           int          `yaml:"version"`
-	AdapterVersion    string       `yaml:"adapter_version"`
-	ToolsFromUpstream bool         `yaml:"tools_from_upstream,omitempty"` // tools/list is fetched from the upstream child
-	ToolsAllow        []string     `yaml:"tools_allow,omitempty"`         // when from upstream: names exposed
-	Tools             []Tool       `yaml:"tools,omitempty"`
-	Operations        []*Operation `yaml:"operations"`
-	digest            string
+	Connector      string            `yaml:"connector"`
+	Version        int               `yaml:"version"`
+	AdapterVersion string            `yaml:"adapter_version"`
+	ToolsDeny      []string          `yaml:"tools_deny,omitempty"`      // upstream tools never exported
+	ToolTransforms []string          `yaml:"tool_transforms,omitempty"` // tools/list hooks, e.g. narrow_site_enum
+	Describe       map[string]string `yaml:"describe,omitempty"`        // tool → description hook, e.g. run_query: named_queries
+	SiteHostsTool  string            `yaml:"site_hosts_tool,omitempty"` // tool whose result lists sites (id, url)
+	Operations     []*Operation      `yaml:"operations"`
+	Source         string            `yaml:"-"` // overlay | embedded | synthesized
+	digest         string
 }
 
 // Query is one named, parameterised, read-only ClickHouse query.
@@ -85,6 +92,7 @@ type QueryOverlay struct {
 
 type Catalog struct {
 	mu         sync.RWMutex
+	overlayDir string
 	connectors map[string]*Connector
 	queries    map[string]Query  // id → query (overlay, all projects)
 	overlays   map[string]string // connector/project → digest
@@ -92,9 +100,9 @@ type Catalog struct {
 
 var queryIDRe = regexp.MustCompile(`^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$`)
 
-// Load parses the embedded connector catalogs.
-func Load() (*Catalog, error) {
-	c := &Catalog{connectors: map[string]*Connector{}, queries: map[string]Query{}, overlays: map[string]string{}}
+// Load parses the embedded connector catalogs. overlayDir may be empty.
+func Load(overlayDir string) (*Catalog, error) {
+	c := &Catalog{overlayDir: overlayDir, connectors: map[string]*Connector{}, queries: map[string]Query{}, overlays: map[string]string{}}
 	entries, err := fs.ReadDir(embedded, "connectors")
 	if err != nil {
 		return nil, err
@@ -104,18 +112,45 @@ func Load() (*Catalog, error) {
 		if err != nil {
 			return nil, err
 		}
-		var conn Connector
-		if err := yaml.Unmarshal(raw, &conn); err != nil {
+		conn, err := parseConnector(raw, "embedded")
+		if err != nil {
 			return nil, fmt.Errorf("catalog %s: %w", e.Name(), err)
 		}
-		if err := conn.compile(); err != nil {
-			return nil, fmt.Errorf("catalog %s: %w", e.Name(), err)
+		c.connectors[conn.Connector] = conn
+	}
+	if overlayDir != "" {
+		matches, _ := filepath.Glob(filepath.Join(overlayDir, "*.yaml"))
+		for _, path := range matches {
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				return nil, err
+			}
+			conn, err := parseConnector(raw, "overlay")
+			if err != nil {
+				return nil, fmt.Errorf("catalog overlay %s: %w", path, err)
+			}
+			want := strings.TrimSuffix(filepath.Base(path), ".yaml")
+			if conn.Connector != want {
+				return nil, fmt.Errorf("catalog overlay %s names connector %q; the file name must match", path, conn.Connector)
+			}
+			c.connectors[conn.Connector] = conn
 		}
-		sum := sha256.Sum256(raw)
-		conn.digest = hex.EncodeToString(sum[:8])
-		c.connectors[conn.Connector] = &conn
 	}
 	return c, nil
+}
+
+func parseConnector(raw []byte, source string) (*Connector, error) {
+	var conn Connector
+	if err := yaml.Unmarshal(raw, &conn); err != nil {
+		return nil, err
+	}
+	if err := conn.compile(); err != nil {
+		return nil, err
+	}
+	sum := sha256.Sum256(raw)
+	conn.digest = hex.EncodeToString(sum[:8])
+	conn.Source = source
+	return &conn, nil
 }
 
 func (c *Connector) compile() error {
@@ -146,12 +181,44 @@ func (c *Connector) compile() error {
 	return nil
 }
 
+// Ensure returns the catalog for a connector, synthesizing one from the
+// discovered tool names when neither an overlay nor an embedded catalog exists:
+// every tool becomes an operation `<connector>.<tool>` an agent grant must list
+// under `operations`; owner grants reach all of them.
+func (c *Catalog) Ensure(name string, toolNames []string) *Connector {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if conn, ok := c.connectors[name]; ok {
+		return conn
+	}
+	conn := &Connector{Connector: name, Version: 1, AdapterVersion: "synth", Source: "synthesized"}
+	for _, t := range toolNames {
+		conn.Operations = append(conn.Operations, &Operation{
+			ID: name + "." + t, Tool: t, Risk: RiskReversible, RequiresCapability: "operations:" + t,
+			Constraints: []string{"calls_per_run"},
+		})
+	}
+	_ = conn.compile()
+	sum := sha256.Sum256([]byte(name + ":" + strings.Join(toolNames, ",")))
+	conn.digest = hex.EncodeToString(sum[:8])
+	c.connectors[name] = conn
+	return conn
+}
+
 func (c *Catalog) Connector(name string) (*Connector, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	conn, ok := c.connectors[name]
 	return conn, ok
 }
 
 func (c *Catalog) Connectors() []string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.connectorNamesLocked()
+}
+
+func (c *Catalog) connectorNamesLocked() []string {
 	out := make([]string, 0, len(c.connectors))
 	for k := range c.connectors {
 		out = append(out, k)
@@ -194,22 +261,31 @@ func (conn *Connector) Resolve(tool string, args map[string]any) (*Operation, bo
 	return nil, false
 }
 
-// ToolExposed reports whether the connector passes this upstream tool through at all.
+// ToolExposed reports whether the connector passes this upstream tool through at
+// all: not denied, and reachable by at least one operation.
 func (conn *Connector) ToolExposed(name string) bool {
-	if conn.ToolsFromUpstream {
-		for _, n := range conn.ToolsAllow {
-			if n == name {
-				return true
-			}
+	for _, d := range conn.ToolsDeny {
+		if d == name {
+			return false
 		}
-		return false
 	}
-	for _, t := range conn.Tools {
-		if t.Name == name {
+	for _, op := range conn.Operations {
+		if op.Tool == name {
 			return true
 		}
 	}
 	return false
+}
+
+// OperationsFor lists the operations bound to a tool.
+func (conn *Connector) OperationsFor(tool string) []*Operation {
+	var out []*Operation
+	for _, op := range conn.Operations {
+		if op.Tool == tool {
+			out = append(out, op)
+		}
+	}
+	return out
 }
 
 // PushQueries replaces the named-query overlay for one project. Ids must be
@@ -284,7 +360,7 @@ func (c *Catalog) PolicyVersion() string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	parts := []string{}
-	for _, name := range c.Connectors() {
+	for _, name := range c.connectorNamesLocked() {
 		parts = append(parts, name+"="+c.connectors[name].digest)
 	}
 	keys := make([]string, 0, len(c.overlays))
@@ -297,9 +373,4 @@ func (c *Catalog) PolicyVersion() string {
 	}
 	sum := sha256.Sum256([]byte(strings.Join(parts, ";")))
 	return hex.EncodeToString(sum[:8])
-}
-
-// ToolJSON renders a tool's input schema as raw JSON for the MCP server.
-func (t Tool) ToolJSON() (json.RawMessage, error) {
-	return json.Marshal(t.InputSchema)
 }
