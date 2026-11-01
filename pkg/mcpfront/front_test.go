@@ -327,3 +327,42 @@ func TestEmptyAggregateStillAdvertisesTools(t *testing.T) {
 		t.Fatalf("empty aggregate must advertise tools with listChanged, got %+v", caps.Tools)
 	}
 }
+
+func TestPlainAggregateKeepsUpstreamNamesUnlessTheyClash(t *testing.T) {
+	h := newHarness(t)
+	_, tok, _ := h.store.Mint(context.Background(), auth.MintRequest{Kind: auth.KindClient, Name: "cc", Capabilities: auth.OwnerCapabilities(), IssuedBy: "t"})
+	list := func(url string) string {
+		s, err := mcp.NewClient(&mcp.Implementation{Name: "t", Version: "0"}, nil).Connect(context.Background(), &mcp.StreamableClientTransport{
+			Endpoint: h.srv.URL + url, MaxRetries: -1, DisableStandaloneSSE: true,
+			HTTPClient: &http.Client{Transport: &bearerRT{token: tok, next: http.DefaultTransport}}}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer s.Close()
+		res, err := s.ListTools(context.Background(), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var names []string
+		for _, tl := range res.Tools {
+			names = append(names, tl.Name)
+		}
+		sort.Strings(names)
+		return strings.Join(names, ",")
+	}
+	if got := list("/mcp?exclude=memory&prefix=none"); got != "list_databases,list_tables,run_query" {
+		t.Fatalf("single connector, plain: %s", got)
+	}
+	// clickhouse and memory fakes expose the same three names: every one clashes, so all stay prefixed.
+	if got := list("/mcp?prefix=none"); !strings.Contains(got, "clickhouse__run_query") || !strings.Contains(got, "memory__run_query") || strings.Contains(got, ",run_query") {
+		t.Fatalf("clashing names must stay prefixed: %s", got)
+	}
+	s, _ := mcp.NewClient(&mcp.Implementation{Name: "t", Version: "0"}, nil).Connect(context.Background(), &mcp.StreamableClientTransport{
+		Endpoint: h.srv.URL + "/mcp?exclude=memory&prefix=none", MaxRetries: -1, DisableStandaloneSSE: true,
+		HTTPClient: &http.Client{Transport: &bearerRT{token: tok, next: http.DefaultTransport}}}, nil)
+	defer s.Close()
+	res, err := s.CallTool(context.Background(), &mcp.CallToolParams{Name: "run_query", Arguments: map[string]any{"query": "@scheduler.freshness"}})
+	if err != nil || res.IsError {
+		t.Fatalf("plain call: %v %s", err, text(res))
+	}
+}

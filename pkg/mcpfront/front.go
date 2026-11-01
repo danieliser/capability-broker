@@ -67,6 +67,7 @@ type liveServer struct {
 	grant     *auth.Grant
 	endpoint  string          // connector name, or AggregateEndpoint
 	exclude   map[string]bool // aggregate only: connectors the client already has as their own servers
+	plain     bool            // aggregate only: upstream tool names unprefixed, except where two connectors clash
 	toolHash  map[string]string
 	toolOwner map[string]string // exported name → connector
 }
@@ -151,7 +152,7 @@ func (f *Front) handler(endpoint string) http.Handler {
 				}
 			}
 		}
-		return f.serverFor(r.Context(), endpoint, g, exclude)
+		return f.serverFor(r.Context(), endpoint, g, exclude, r.URL.Query().Get("prefix") == "none")
 	}, &mcp.StreamableHTTPOptions{SessionTimeout: f.SessionTimeout, Logger: f.Logger, Stateless: f.Stateless})
 	f.handlers[endpoint] = h
 	return h
@@ -178,9 +179,9 @@ func (f *Front) authenticate(r *http.Request) (*auth.Grant, string, string) {
 }
 
 // serverFor returns the stable server for (endpoint, grant, exclude), creating and populating it once.
-func (f *Front) serverFor(ctx context.Context, endpoint string, g *auth.Grant, exclude []string) *mcp.Server {
+func (f *Front) serverFor(ctx context.Context, endpoint string, g *auth.Grant, exclude []string, plain bool) *mcp.Server {
 	sort.Strings(exclude)
-	key := endpoint + "|" + g.ID + "|" + strings.Join(exclude, ",")
+	key := endpoint + "|" + g.ID + "|" + strings.Join(exclude, ",") + fmt.Sprintf("|plain=%v", plain)
 	f.mu.Lock()
 	if f.servers == nil {
 		f.servers = map[string]*liveServer{}
@@ -195,7 +196,8 @@ func (f *Front) serverFor(ctx context.Context, endpoint string, g *auth.Grant, e
 			// Declared up front: a server that starts with no tools (an aggregate whose connectors are all
 			// excluded, or still starting) must still tell the client it has tools and will announce changes.
 			Capabilities: &mcp.ServerCapabilities{Tools: &mcp.ToolCapabilities{ListChanged: true}}}),
-			grant: g, endpoint: endpoint, exclude: map[string]bool{}, toolHash: map[string]string{}, toolOwner: map[string]string{}}
+			grant: g, endpoint: endpoint, exclude: map[string]bool{}, plain: plain && endpoint == AggregateEndpoint,
+			toolHash: map[string]string{}, toolOwner: map[string]string{}}
 		for _, e := range exclude {
 			ls.exclude[e] = true
 		}
@@ -279,6 +281,22 @@ func (f *Front) refreshOne(ctx context.Context, ls *liveServer, initial bool) {
 			}
 			desired[exported] = def{connector: name, upstream: t.Name, tool: t}
 		}
+	}
+	if ls.plain {
+		// Unprefixed: each tool keeps its upstream name; only names two connectors share stay prefixed.
+		count := map[string]int{}
+		for _, d := range desired {
+			count[d.upstream]++
+		}
+		renamed := map[string]def{}
+		for exported, d := range desired {
+			if count[d.upstream] == 1 {
+				renamed[d.upstream] = d
+			} else {
+				renamed[exported] = d
+			}
+		}
+		desired = renamed
 	}
 	var remove []string
 	for exported, owner := range ls.toolOwner {

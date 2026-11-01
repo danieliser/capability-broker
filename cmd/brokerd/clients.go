@@ -53,11 +53,13 @@ func runClientInstall(ctx context.Context, args []string) int {
 	fs := flag.NewFlagSet("client install", flag.ContinueOnError)
 	only := fs.String("connectors", "", "connectors to route as their own servers (default: every connector the broker runs)")
 	revert := fs.Bool("revert", false, "restore the entries the broker replaced and remove its own")
+	mode := fs.String("mode", "single", "single: one broker entry carrying every connector; servers: one entry per connector plus broker for later ones")
+	prefix := fs.String("prefix", "connector", "single mode tool names: connector (<connector>__<tool>) or none (upstream names; prefixed only on a clash)")
 	target := ""
 	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
 		target, args = args[0], args[1:]
 	}
-	if err := fs.Parse(args); err != nil || target == "" {
+	if err := fs.Parse(args); err != nil || target == "" || (*mode != "single" && *mode != "servers") || (*prefix != "connector" && *prefix != "none") {
 		return fail("usage: brokerd client install <claude-code|codex|cursor|opencode|all> [--connectors a,b] [--revert]")
 	}
 	cfg := config.FromEnv()
@@ -114,11 +116,7 @@ func runClientInstall(ctx context.Context, args []string) int {
 				failed++
 				continue
 			}
-			base := "http://" + cfg.FrontAddr()
-			for _, name := range connectors {
-				entries = append(entries, entry{Name: name, URL: base + "/mcp/" + name, Token: token})
-			}
-			entries = append(entries, entry{Name: "broker", URL: base + "/mcp?exclude=" + strings.Join(connectors, ","), Token: token})
+			entries = buildEntries(cfg, connectors, token, *mode, *prefix)
 		}
 		orig, err := os.ReadFile(path)
 		if err != nil {
@@ -154,7 +152,7 @@ func runClientInstall(ctx context.Context, args []string) int {
 		_ = os.MkdirAll(filepath.Dir(backupPath), 0o700)
 		_ = os.WriteFile(backupPath, raw, 0o600)
 		// Managed: the daemon keeps this client's entries in step with the connectors it runs.
-		_ = os.WriteFile(managed, []byte("1\n"), 0o600)
+		_ = os.WriteFile(managed, []byte(*mode+" "+*prefix+"\n"), 0o600)
 		names := make([]string, 0, len(entries))
 		for _, e := range entries {
 			names = append(names, e.Name)
@@ -380,8 +378,13 @@ func syncManagedClients(cfg config.Config, connectors []string, log func(msg str
 	sort.Strings(connectors)
 	for _, c := range clients {
 		dir := filepath.Join(cfg.DataDir, "clients")
-		if _, err := os.Stat(filepath.Join(dir, c.name+".managed")); err != nil {
+		marker, err := os.ReadFile(filepath.Join(dir, c.name+".managed"))
+		if err != nil {
 			continue
+		}
+		mode, prefix := "servers", "connector" // markers written before modes existed
+		if f := strings.Fields(string(marker)); len(f) == 2 {
+			mode, prefix = f[0], f[1]
 		}
 		raw, err := os.ReadFile(filepath.Join(dir, c.name+".token"))
 		if err != nil {
@@ -392,12 +395,7 @@ func syncManagedClients(cfg config.Config, connectors []string, log func(msg str
 		if _, err := os.Stat(path); err != nil {
 			continue
 		}
-		base := "http://" + cfg.FrontAddr()
-		var entries []entry
-		for _, name := range connectors {
-			entries = append(entries, entry{Name: name, URL: base + "/mcp/" + name, Token: token})
-		}
-		entries = append(entries, entry{Name: "broker", URL: base + "/mcp?exclude=" + strings.Join(connectors, ","), Token: token})
+		entries := buildEntries(cfg, connectors, token, mode, prefix)
 		var backup map[string]json.RawMessage
 		for attempt := 0; attempt < 3; attempt++ {
 			if backup, err = c.apply(path, entries, nil); err == nil {
@@ -424,4 +422,23 @@ func syncManagedClients(cfg config.Config, connectors []string, log func(msg str
 		}
 		log("client synced", "client", c.name, "connectors", connectors)
 	}
+}
+
+// buildEntries renders a client's broker entries. single: one `broker` entry on the aggregate endpoint, so every
+// connector, including ones added later, arrives through it with tool names passed through. servers: one entry per
+// connector (the client's own server names) plus `broker` excluding them.
+func buildEntries(cfg config.Config, connectors []string, token, mode, prefix string) []entry {
+	base := "http://" + cfg.FrontAddr()
+	if mode == "single" {
+		url := base + "/mcp"
+		if prefix == "none" {
+			url += "?prefix=none"
+		}
+		return []entry{{Name: "broker", URL: url, Token: token}}
+	}
+	var entries []entry
+	for _, name := range connectors {
+		entries = append(entries, entry{Name: name, URL: base + "/mcp/" + name, Token: token})
+	}
+	return append(entries, entry{Name: "broker", URL: base + "/mcp?exclude=" + strings.Join(connectors, ","), Token: token})
 }
