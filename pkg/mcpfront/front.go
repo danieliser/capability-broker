@@ -68,6 +68,7 @@ type liveServer struct {
 	endpoint  string          // connector name, or AggregateEndpoint
 	exclude   map[string]bool // aggregate only: connectors the client already has as their own servers
 	plain     bool            // aggregate only: upstream tool names unprefixed, except where two connectors clash
+	hint      bool            // prepend a one-line "live connection" note to each tool description (clients that drop server instructions)
 	toolHash  map[string]string
 	toolOwner map[string]string // exported name → connector
 }
@@ -152,7 +153,8 @@ func (f *Front) handler(endpoint string) http.Handler {
 				}
 			}
 		}
-		return f.serverFor(r.Context(), endpoint, g, exclude, r.URL.Query().Get("prefix") == "none", r.URL.Query().Get("instructions") == "none")
+		q := r.URL.Query()
+		return f.serverFor(r.Context(), endpoint, g, exclude, q.Get("prefix") == "none", q.Get("instructions") == "none", q.Get("hint") == "live")
 	}, &mcp.StreamableHTTPOptions{SessionTimeout: f.SessionTimeout, Logger: f.Logger, Stateless: f.Stateless})
 	f.handlers[endpoint] = h
 	return h
@@ -179,9 +181,9 @@ func (f *Front) authenticate(r *http.Request) (*auth.Grant, string, string) {
 }
 
 // serverFor returns the stable server for (endpoint, grant, exclude), creating and populating it once.
-func (f *Front) serverFor(ctx context.Context, endpoint string, g *auth.Grant, exclude []string, plain, noInstructions bool) *mcp.Server {
+func (f *Front) serverFor(ctx context.Context, endpoint string, g *auth.Grant, exclude []string, plain, noInstructions, hint bool) *mcp.Server {
 	sort.Strings(exclude)
-	key := endpoint + "|" + g.ID + "|" + strings.Join(exclude, ",") + fmt.Sprintf("|plain=%v|noinst=%v", plain, noInstructions)
+	key := endpoint + "|" + g.ID + "|" + strings.Join(exclude, ",") + fmt.Sprintf("|plain=%v|noinst=%v|hint=%v", plain, noInstructions, hint)
 	f.mu.Lock()
 	if f.servers == nil {
 		f.servers = map[string]*liveServer{}
@@ -197,7 +199,7 @@ func (f *Front) serverFor(ctx context.Context, endpoint string, g *auth.Grant, e
 			// Declared up front: a server that starts with no tools (an aggregate whose connectors are all
 			// excluded, or still starting) must still tell the client it has tools and will announce changes.
 			Capabilities: &mcp.ServerCapabilities{Tools: &mcp.ToolCapabilities{ListChanged: true}}}),
-			grant: g, endpoint: endpoint, exclude: map[string]bool{}, plain: plain && endpoint == AggregateEndpoint,
+			grant: g, endpoint: endpoint, exclude: map[string]bool{}, plain: plain && endpoint == AggregateEndpoint, hint: hint,
 			toolHash: map[string]string{}, toolOwner: map[string]string{}}
 		for _, e := range exclude {
 			ls.exclude[e] = true
@@ -247,6 +249,18 @@ func (f *Front) instructions(endpoint string, g *auth.Grant, exclude []string) s
 	}
 	return "These tools are live connections to: " + strings.Join(parts, "; ") +
 		". When a question needs data, remembered facts or site information, call these tools instead of answering from the conversation; your workspace being read-only does not limit them."
+}
+
+func liveAbout(connector string) string {
+	switch connector {
+	case "clickhouse":
+		return "use it for warehouse data, tables and counts"
+	case "memory":
+		return "use it to recall or store long-term memory"
+	case "wp-mcp-router":
+		return "use it for the WordPress sites"
+	}
+	return "use it when a task needs " + connector
 }
 
 // Refresh re-derives every live server's tool list from the current registry and catalog and edits it in
@@ -352,6 +366,9 @@ func (f *Front) refreshOne(ctx context.Context, ls *liveServer, initial bool) {
 		}
 	}
 	for exported, d := range desired {
+		if ls.hint {
+			d.tool.Description = "Live " + d.connector + " connection: " + liveAbout(d.connector) + ". " + d.tool.Description
+		}
 		raw, err := json.Marshal(withVerbose(d.tool.InputSchema))
 		if err != nil {
 			continue
