@@ -4,6 +4,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-01
+
 - npx/uvx connectors are pinned: the version is resolved once, installed under `~/.brokerd/runtimes`, and run directly; rechecked after `--pin-ttl` (24h); `pin: false` opts out. `pins.json` records what runs.
 - launchd `ProcessType` is `Standard`; `Background` throttled every MCP child (starts were 10 to 35 times slower).
 - Restart: health answers about 0.25s after a kill and pinned children connect within about 1.5s. Shutdown waits only for in-flight tool calls; children get a 1s grace.
