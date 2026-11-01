@@ -60,7 +60,9 @@ if [ "$(uname)" = "Darwin" ]; then
     <key>KeepAlive</key>
     <true/>
     <key>ProcessType</key>
-    <string>Background</string>
+    <!-- Not Background: macOS throttles a Background job's CPU and I/O, and every MCP child inherits it
+         (measured: children started 10-35x slower than by hand). -->
+    <string>Standard</string>
     <key>StandardOutPath</key>
     <string>$LOG_DIR/brokerd.log</string>
     <key>StandardErrorPath</key>
