@@ -123,7 +123,7 @@ func (a *Adapter) ensure(ctx context.Context) (*mcp.ClientSession, *catalog.Conn
 	client := mcp.NewClient(&mcp.Implementation{Name: "brokerd", Version: "1"}, a.relay.clientOptions())
 	cctx, cancel := context.WithTimeout(ctx, a.spec.StartupTimeout)
 	defer cancel()
-	session, err := client.Connect(cctx, &mcp.CommandTransport{Command: cmd, TerminateDuration: 5 * time.Second}, nil)
+	session, err := client.Connect(cctx, &mcp.CommandTransport{Command: cmd, TerminateDuration: time.Second}, nil)
 	if err != nil {
 		return nil, nil, adapter.Unavailable(a.spec.Name + " did not start: " + adapter.Truncate(err.Error(), 200))
 	}

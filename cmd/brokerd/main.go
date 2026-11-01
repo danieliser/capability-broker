@@ -115,7 +115,7 @@ func run(cfg config.Config, stateless bool) error {
 	} else if len(res.Added) == 0 {
 		logger.Warn("no connectors configured; copy connectors.example.yaml to the data dir", "path", cfg.ConnectorsPath())
 	}
-	defer closeAll(reg, 5*time.Second)
+	defer closeAll(reg, 1500*time.Millisecond)
 	// Hot reload: poll the data-root files, and apply on SIGHUP too.
 	go reloader.Watch(ctx, 2*time.Second)
 	hup := make(chan os.Signal, 1)
