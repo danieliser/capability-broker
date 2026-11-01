@@ -112,7 +112,9 @@ type mintResponse struct {
 	GrantID   string            `json:"grant_id"`
 	Token     string            `json:"token"`
 	ExpiresAt *time.Time        `json:"expires_at,omitempty"`
-	Servers   map[string]string `json:"servers"` // connector → front URL
+	Servers   map[string]string `json:"servers"` // the single `broker` server
+	// ConnectorServers are the per-connector endpoints, for callers that want one server per connector.
+	ConnectorServers map[string]string `json:"connector_servers"`
 }
 
 func (a *Admin) mintGrant(w http.ResponseWriter, r *http.Request) {
@@ -157,7 +159,7 @@ func (a *Admin) mintGrant(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "ADMIN_MINT_FAILED", err.Error())
 		return
 	}
-	servers := map[string]string{}
+	perConnector := map[string]string{}
 	connectors := caps.Connectors()
 	if caps.IsOwner() {
 		for _, name := range a.Registry.Names() {
@@ -165,10 +167,12 @@ func (a *Admin) mintGrant(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	for _, name := range connectors {
-		servers[name] = a.FrontURL + "/mcp/" + name
+		perConnector[name] = a.FrontURL + "/mcp/" + name
 	}
-	servers["broker"] = a.FrontURL + "/mcp"
-	writeJSON(w, http.StatusCreated, mintResponse{GrantID: g.ID, Token: token, ExpiresAt: g.ExpiresAt, Servers: servers})
+	// One server carrying everything the grant reaches, upstream tool names kept (measured equal to per-connector
+	// servers for low-effort models, and new connectors arrive in it without a reconnect).
+	servers := map[string]string{"broker": a.FrontURL + "/mcp?prefix=none"}
+	writeJSON(w, http.StatusCreated, mintResponse{GrantID: g.ID, Token: token, ExpiresAt: g.ExpiresAt, Servers: servers, ConnectorServers: perConnector})
 }
 
 func (a *Admin) listGrants(w http.ResponseWriter, r *http.Request) {
