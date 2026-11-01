@@ -94,8 +94,9 @@ func (r *Reloader) Apply(ctx context.Context) (Result, error) {
 		prev := r.Registry.Set(name, ad)
 		r.digests[name] = d
 		if prev != nil {
+			// Closed in the background: a child still mid-start holds its lock, and a reload must not wait on it.
 			if c, ok := prev.(interface{ Close() error }); ok {
-				_ = c.Close()
+				go func() { _ = c.Close() }()
 			}
 			res.Restarted = append(res.Restarted, name)
 		} else {
@@ -113,7 +114,7 @@ func (r *Reloader) Apply(ctx context.Context) (Result, error) {
 		}
 		if prev := r.Registry.Remove(name); prev != nil {
 			if c, ok := prev.(interface{ Close() error }); ok {
-				_ = c.Close()
+				go func() { _ = c.Close() }()
 			}
 		}
 		delete(r.digests, name)
