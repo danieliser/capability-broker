@@ -4,6 +4,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+- Agent evaluation in `docs/eval.md`: Haiku 5.5 and GPT-6 Luna at low effort, three client setups, six tasks. Setup and prefix do not matter; Codex agents need one sentence saying the tools are live.
+- A grant mints one `broker` server with upstream tool names; per-connector URLs are returned in `connector_servers`.
+
 - Default install is one `broker` server with upstream tool names (`--prefix none`); measured equal to per-connector servers for Haiku 5.5 and GPT-6 Luna at low effort.
 - MCP server instructions name the live connectors behind each server (Claude Code shows them to the model; Codex drops them). `?instructions=none` and `?hint=live` exist for A/B tests.
 
