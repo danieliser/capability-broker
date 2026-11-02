@@ -165,6 +165,9 @@ func runClientAdopt(ctx context.Context, args []string) int {
 		if err := saveAdopted(cfg, adopted); err != nil {
 			return fail("%v", err)
 		}
+		for _, w := range clientRules(home, name) {
+			fmt.Printf("%-24s WARNING: %s; these name the old server and no longer apply to its tools through the broker. Mirror them onto mcp__broker__<tool> (Claude Code) or [mcp_servers.broker.tools.\"<tool>\"] (Codex).\n", name, w)
+		}
 	}
 	if !*dry {
 		if ac, _, err := adminClient(); err == nil {
@@ -229,6 +232,39 @@ func runClientRestore(ctx context.Context, args []string) int {
 		return 1
 	}
 	return 0
+}
+
+// clientRules finds permission and approval rules that clients keep per server name: Claude Code's
+// permissions.{allow,ask,deny} entries and Codex's approval settings. Adopting a server silently drops them.
+func clientRules(home, name string) []string {
+	var out []string
+	for _, p := range []string{filepath.Join(home, ".claude", "settings.json"), filepath.Join(home, ".claude", "settings.local.json")} {
+		doc, err := readJSONC(p)
+		if err != nil {
+			continue
+		}
+		perm, _ := doc["permissions"].(map[string]any)
+		n := 0
+		for _, list := range []string{"allow", "ask", "deny"} {
+			for _, r := range stringSlice(perm[list]) {
+				if strings.HasPrefix(r, "mcp__"+name+"__") || r == "mcp__"+name {
+					n++
+				}
+			}
+		}
+		if n > 0 {
+			out = append(out, fmt.Sprintf("%s has %d permission rule(s) for mcp__%s", p, n, name))
+		}
+	}
+	if raw, err := os.ReadFile(filepath.Join(home, ".codex", "config.toml")); err == nil {
+		for _, b := range splitTOML(string(raw)) {
+			if codexServer(b.header) == name && strings.Contains(b.text, "approval_mode") {
+				out = append(out, "~/.codex/config.toml has approval settings for "+name)
+				break
+			}
+		}
+	}
+	return out
 }
 
 // findSource returns the first client config holding a non-broker entry for name, as a generic JSON entry.

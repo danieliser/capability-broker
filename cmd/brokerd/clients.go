@@ -326,6 +326,12 @@ func applyCodex(path string, entries []entry, revert map[string]json.RawMessage)
 			continue // a connector the broker no longer runs
 		}
 		if name := codexServer(b.header); name != "" && names[name] {
+			// Per-tool settings under a broker entry ([mcp_servers.broker.tools."x"] approval_mode) belong to
+			// the owner, not the installer: keep them across syncs unless the broker entry itself is reverted.
+			if revert == nil && b.header != "[mcp_servers."+name+"]" && strings.HasPrefix(b.header, "[mcp_servers."+name+".tools.") {
+				kept = append(kept, b.text)
+				continue
+			}
 			removed[name] += b.text
 			continue
 		}

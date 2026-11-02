@@ -4,6 +4,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-11-02
+
+- Codex per-tool settings under the broker entry (`[mcp_servers.broker.tools."<tool>"] approval_mode`) survive client syncs; they were rewritten away with the entry.
+- `brokerd client adopt` warns when Claude Code permission rules or Codex approval settings name the adopted server: those rules stop matching once its tools arrive through the broker.
+
 ## [0.6.1] - 2026-11-02
 
 - OAuth token refresh uses the broker's HTTP/1.1 client; Cloudflare-fronted token endpoints refused the default client, so a sign-in died at its first access-token expiry.
