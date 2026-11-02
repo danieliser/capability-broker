@@ -366,3 +366,10 @@ func TestPlainAggregateKeepsUpstreamNamesUnlessTheyClash(t *testing.T) {
 		t.Fatalf("plain call: %v %s", err, text(res))
 	}
 }
+
+func TestDiscoveryInstructionsNameConnectors(t *testing.T) {
+	got := discoveryInstructions([]string{"metabase", "vercel"})
+	if !strings.Contains(got, "metabase, vercel") || !strings.Contains(got, "search_tools") || !strings.Contains(got, "call_tool") {
+		t.Fatalf("instructions: %q", got)
+	}
+}

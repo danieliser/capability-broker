@@ -243,7 +243,7 @@ func (f *Front) instructions(endpoint string, g *auth.Grant, exclude []string) s
 		names = []string{endpoint}
 	}
 	if g.Capabilities.IsOwner() {
-		return f.ownerInstructions(g, names)
+		return f.ownerInstructions(g, endpoint == AggregateEndpoint, names)
 	}
 	if len(names) == 0 {
 		return "Live connectors added to this server later appear as new tools; check your tool list when a task needs a system you do not see."
@@ -267,7 +267,7 @@ func (f *Front) instructions(endpoint string, g *auth.Grant, exclude []string) s
 
 // ownerInstructions passes each upstream server's own instructions through, as the client would have shown
 // them with the server connected directly. Nothing of the broker's own is added.
-func (f *Front) ownerInstructions(g *auth.Grant, names []string) string {
+func (f *Front) ownerInstructions(g *auth.Grant, aggregate bool, names []string) string {
 	var parts []string
 	var onDemand []string
 	var direct []string
@@ -276,7 +276,7 @@ func (f *Front) ownerInstructions(g *auth.Grant, names []string) string {
 		if sp != nil && !sp.ForClient(g.Name) {
 			continue
 		}
-		if sp != nil && sp.OnDemand() && len(names) > 1 {
+		if sp != nil && sp.OnDemand() && aggregate {
 			onDemand = append(onDemand, n)
 			continue
 		}
