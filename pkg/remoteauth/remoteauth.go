@@ -35,6 +35,17 @@ var ErrNeedsAuth = errors.New("needs sign-in")
 
 const CallbackPath = "/oauth/callback"
 
+// UserAgent identifies the broker to remote servers (and keeps bot protection from refusing Go's default).
+const UserAgent = "brokerd (capability-broker; +https://github.com/danieliser/capability-broker)"
+
+type uaTransport struct{ base http.RoundTripper }
+
+func (t uaTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	r = r.Clone(r.Context())
+	r.Header.Set("User-Agent", UserAgent)
+	return t.base.RoundTrip(r)
+}
+
 // Manager owns every connector's OAuth state.
 type Manager struct {
 	DataDir     string
@@ -168,7 +179,7 @@ func (h *handler) build(spec *connectors.Spec) error {
 		RequestRefreshToken:      true,
 		AcceptUnadvertisedIss:    true,
 		AuthorizationCodeFetcher: h.fetch,
-		Client:                   &http.Client{Timeout: 30 * time.Second},
+		Client:                   &http.Client{Timeout: 30 * time.Second, Transport: uaTransport{base: http.DefaultTransport}},
 		NewTokenSource: func(ctx context.Context, c *oauth2.Config, t *oauth2.Token) (oauth2.TokenSource, error) {
 			s := &stored{ClientID: c.ClientID, ClientSecret: c.ClientSecret, AuthURL: c.Endpoint.AuthURL, TokenURL: c.Endpoint.TokenURL,
 				AuthStyle: int(c.Endpoint.AuthStyle), Scopes: c.Scopes, Token: t, SignedInAt: time.Now()}

@@ -155,11 +155,11 @@ type headerTransport struct {
 }
 
 func (t headerTransport) RoundTrip(r *http.Request) (*http.Response, error) {
-	if len(t.headers) > 0 {
-		r = r.Clone(r.Context())
-		for k, v := range t.headers {
-			r.Header.Set(k, v)
-		}
+	r = r.Clone(r.Context())
+	// Bot protection in front of some servers (Cloudflare) answers Go's default User-Agent with 403.
+	r.Header.Set("User-Agent", remoteauth.UserAgent)
+	for k, v := range t.headers {
+		r.Header.Set(k, v)
 	}
 	return t.base.RoundTrip(r)
 }
