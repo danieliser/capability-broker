@@ -122,7 +122,7 @@ func (e *needsAuth) Unwrap() error { return remoteauth.ErrNeedsAuth }
 // transport is a stdio child for command connectors, Streamable HTTP for url connectors.
 func (a *Adapter) transport() (mcp.Transport, error) {
 	if a.spec.URL != "" {
-		hc := &http.Client{Transport: headerTransport{headers: a.spec.Headers, base: http.DefaultTransport}}
+		hc := &http.Client{Transport: headerTransport{headers: a.spec.Headers, base: remoteauth.HTTP1Transport()}}
 		t := &mcp.StreamableClientTransport{Endpoint: a.spec.URL, HTTPClient: hc, MaxRetries: 2}
 		if a.spec.OAuth != nil {
 			if a.Auth == nil {
