@@ -4,6 +4,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-03
+
+- Owner clients get each upstream's prompts, resources and resource templates, as if connected directly (`strip: [prompts]` / `[resources]` hides them).
+- Upstream list changes are followed: a server that adds or removes tools, prompts or resources at runtime announces it, the broker re-reads it, and connected clients get `list_changed`. Before, such changes were invisible until a restart.
+- `cmd/mockmcp`, a stdio server exercising every passed-through feature (annotations, output schemas, structured, image and error results, instructions, prompts, resources, templates, runtime list changes), and `test/e2e` running the broker against it.
+- WordPress drafts admit only the supported `core/create-post` and `gk-block-mcp/create-post` schemas, with draft status forced and post type/site/run limits checked. Update abilities no longer resolve as drafting: forcing draft on an update could unpublish a live post.
+- Block MCP `resolve-url` maps to `content.read`; `get-page-blocks` forces `persist_refs: false` so a read cannot silently persist block references.
+- `skills/brokerd-operations`: an agent skill for running the broker.
+
 ## [0.8.0] - 2026-11-02
 
 - `expose: broker` keeps a connector inside the broker for owner clients: no client entry and no preloaded tools, found and run through three discovery tools on the broker entry (`search_tools`, `describe_tool`, `call_tool`). `expose: passthrough` (default) keeps its own entry. Measured: Haiku 5.5 low 3/3 and GPT-6 Luna low (Codex, which drops server instructions) 3/3 found and used an on-demand Metabase tool.
