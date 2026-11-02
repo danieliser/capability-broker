@@ -125,3 +125,19 @@ func TestReinsertWhenBackupStripped(t *testing.T) {
 		t.Fatal("stdio bridge should count as a broker entry")
 	}
 }
+
+func TestApplyCodexKeepsBrokerToolApprovals(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	src := "[mcp_servers.broker]\nurl = \"http://127.0.0.1:8890/mcp?prefix=none\"\nenabled = true\n\n[mcp_servers.broker.tools.\"cloudflare-api__execute\"]\napproval_mode = \"prompt\"\n"
+	_ = os.WriteFile(path, []byte(src), 0o600)
+	if _, err := applyCodex(path, []entry{{Name: "broker", URL: "http://127.0.0.1:8890/mcp?prefix=none", Token: "t"}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := os.ReadFile(path)
+	if !strings.Contains(string(got), "[mcp_servers.broker.tools.\"cloudflare-api__execute\"]\napproval_mode = \"prompt\"") {
+		t.Fatalf("approval lost:\n%s", got)
+	}
+	if strings.Count(string(got), "[mcp_servers.broker]") != 1 {
+		t.Fatalf("broker table duplicated:\n%s", got)
+	}
+}
