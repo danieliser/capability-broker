@@ -7,10 +7,12 @@
 package upstream
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -160,6 +162,28 @@ func (t headerTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	r.Header.Set("User-Agent", remoteauth.UserAgent)
 	for k, v := range t.headers {
 		r.Header.Set(k, v)
+	}
+	// initialize carries no Mcp-Protocol-Version header (the version is not agreed yet), and some servers
+	// (agents.stackoverflow.com) answer that with 403 instead of the 401 that starts sign-in. Send the
+	// version the request itself proposes.
+	if r.Method == http.MethodPost && r.Header.Get("Mcp-Protocol-Version") == "" && r.Body != nil {
+		body, err := io.ReadAll(r.Body)
+		_ = r.Body.Close()
+		if err != nil {
+			return nil, err
+		}
+		var msg struct {
+			Method string `json:"method"`
+			Params struct {
+				ProtocolVersion string `json:"protocolVersion"`
+			} `json:"params"`
+		}
+		if json.Unmarshal(body, &msg) == nil && msg.Method == "initialize" && msg.Params.ProtocolVersion != "" {
+			r.Header.Set("Mcp-Protocol-Version", msg.Params.ProtocolVersion)
+		}
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		r.GetBody = func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(body)), nil }
+		r.ContentLength = int64(len(body))
 	}
 	return t.base.RoundTrip(r)
 }
