@@ -99,6 +99,10 @@ func (f *Front) ServeConnector(w http.ResponseWriter, r *http.Request, connector
 	if g == nil {
 		return
 	}
+	if sp := f.specOf(connector); sp != nil && g.Capabilities.IsOwner() && !sp.ForClient(g.Name) {
+		writeError(w, http.StatusNotFound, "BROKER_UNKNOWN_CONNECTOR", "no connector "+connector+" for "+g.Name)
+		return
+	}
 	f.handler(connector).ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), grantKey, g)))
 }
 
@@ -239,7 +243,7 @@ func (f *Front) instructions(endpoint string, g *auth.Grant, exclude []string) s
 		names = []string{endpoint}
 	}
 	if g.Capabilities.IsOwner() {
-		return f.ownerInstructions(names)
+		return f.ownerInstructions(g, names)
 	}
 	if len(names) == 0 {
 		return "Live connectors added to this server later appear as new tools; check your tool list when a task needs a system you do not see."
@@ -263,9 +267,28 @@ func (f *Front) instructions(endpoint string, g *auth.Grant, exclude []string) s
 
 // ownerInstructions passes each upstream server's own instructions through, as the client would have shown
 // them with the server connected directly. Nothing of the broker's own is added.
-func (f *Front) ownerInstructions(names []string) string {
+func (f *Front) ownerInstructions(g *auth.Grant, names []string) string {
 	var parts []string
+	var onDemand []string
+	var direct []string
 	for _, n := range names {
+		sp := f.specOf(n)
+		if sp != nil && !sp.ForClient(g.Name) {
+			continue
+		}
+		if sp != nil && sp.OnDemand() && len(names) > 1 {
+			onDemand = append(onDemand, n)
+			continue
+		}
+		direct = append(direct, n)
+	}
+	if len(onDemand) > 0 {
+		parts = append(parts, discoveryInstructions(onDemand))
+	}
+	for _, n := range direct {
+		if sp := f.specOf(n); sp != nil && sp.Strips("instructions") {
+			continue
+		}
 		ad, ok := f.Registry.Lookup(n)
 		if !ok {
 			continue
@@ -317,22 +340,30 @@ type readiness interface{ Ready() bool }
 func (f *Front) refreshOne(ctx context.Context, ls *liveServer, initial bool) {
 	ls.mu.Lock()
 	defer ls.mu.Unlock()
-	var connectors []string
+	var connectors, onDemand []string
+	owner := ls.grant.Capabilities.IsOwner()
 	if ls.endpoint == AggregateEndpoint {
 		for _, name := range f.Registry.Names() {
 			if ls.exclude[name] {
 				continue
 			}
-			if _, ok := ls.grant.Capabilities.For(name); ok {
-				connectors = append(connectors, name)
+			if _, ok := ls.grant.Capabilities.For(name); !ok {
+				continue
 			}
+			if sp := f.specOf(name); owner && sp != nil {
+				if !sp.ForClient(ls.grant.Name) {
+					continue
+				}
+				if sp.OnDemand() {
+					// Kept inside the broker: reached through the discovery tools, not preloaded.
+					onDemand = append(onDemand, name)
+					continue
+				}
+			}
+			connectors = append(connectors, name)
 		}
 	} else {
 		connectors = []string{ls.endpoint}
-	}
-	type def struct {
-		connector, upstream string
-		tool                catalog.Tool
 	}
 	desired := map[string]def{}
 	keep := map[string]bool{} // connectors not ready yet: leave their current tools alone
@@ -388,8 +419,8 @@ func (f *Front) refreshOne(ctx context.Context, ls *liveServer, initial bool) {
 	}
 	var remove []string
 	for exported, owner := range ls.toolOwner {
-		if _, still := desired[exported]; still || keep[owner] {
-			continue
+		if _, still := desired[exported]; still || keep[owner] || owner == discoveryOwner {
+			continue // discovery tools are managed by syncDiscovery
 		}
 		remove = append(remove, exported)
 	}
@@ -400,12 +431,12 @@ func (f *Front) refreshOne(ctx context.Context, ls *liveServer, initial bool) {
 			delete(ls.toolOwner, n)
 		}
 	}
-	owner := ls.grant.Capabilities.IsOwner()
+	f.syncDiscovery(ls, onDemand, desired)
 	for exported, d := range desired {
 		if owner && d.tool.Upstream != nil {
 			// Owner clients see the upstream tool exactly as declared (title, annotations, output schema,
-			// icons, _meta), under its exported name and with no broker arguments.
-			t := *d.tool.Upstream
+			// icons, _meta), under its exported name and with no broker arguments, minus what the connector strips.
+			t := f.shapeTool(d.connector, *d.tool.Upstream)
 			t.Name = exported
 			raw, _ := json.Marshal(&t)
 			sum := sha256.Sum256(raw)
@@ -441,6 +472,11 @@ func (f *Front) refreshOne(ctx context.Context, ls *liveServer, initial bool) {
 		ls.toolHash[exported] = h
 		ls.toolOwner[exported] = connector
 	}
+}
+
+type def struct {
+	connector, upstream string
+	tool                catalog.Tool
 }
 
 // Invalidate drops cached servers for a grant (after revocation), or every server when grantID is empty.

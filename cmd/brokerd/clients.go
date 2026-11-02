@@ -12,7 +12,10 @@ import (
 	"strings"
 	"time"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/danieliser/capability-broker/pkg/config"
+	"github.com/danieliser/capability-broker/pkg/connectors"
 )
 
 // A client is an MCP host whose user config the broker can take over: per-connector http entries for the
@@ -143,7 +146,7 @@ func runClientInstall(ctx context.Context, args []string) int {
 				failed++
 				continue
 			}
-			entries = buildEntries(cfg, connectors, token, *mode, *prefix)
+			entries = buildEntries(cfg, c.name, connectors, token, *mode, *prefix)
 		}
 		orig, err := os.ReadFile(path)
 		if err != nil {
@@ -435,7 +438,7 @@ func syncManagedClients(cfg config.Config, connectors []string, log func(msg str
 		if _, err := os.Stat(path); err != nil {
 			continue
 		}
-		entries := buildEntries(cfg, connectors, token, mode, prefix)
+		entries := buildEntries(cfg, c.name, connectors, token, mode, prefix)
 		var backup map[string]json.RawMessage
 		for attempt := 0; attempt < 3; attempt++ {
 			if backup, err = c.apply(path, entries, nil); err == nil {
@@ -467,7 +470,40 @@ func syncManagedClients(cfg config.Config, connectors []string, log func(msg str
 // buildEntries renders a client's broker entries. single: one `broker` entry on the aggregate endpoint, so every
 // connector, including ones added later, arrives through it with tool names passed through. servers: one entry per
 // connector (the client's own server names) plus `broker` excluding them.
-func buildEntries(cfg config.Config, connectors []string, token, mode, prefix string) []entry {
+// specsFor reads connectors.yaml for the client-facing fields only (no secrets are resolved).
+func specsFor(cfg config.Config) map[string]*connectors.Spec {
+	out := map[string]*connectors.Spec{}
+	raw, err := os.ReadFile(cfg.ConnectorsPath())
+	if err != nil {
+		return out
+	}
+	var f connectors.File
+	if yaml.Unmarshal(raw, &f) == nil {
+		for k, v := range f.Connectors {
+			if v != nil {
+				out[k] = v
+			}
+		}
+	}
+	return out
+}
+
+func buildEntries(cfg config.Config, client string, all []string, token, mode, prefix string) []entry {
+	// Connectors this client does not get are dropped; on-demand (expose: broker) ones get no entry of their
+	// own and stay reachable through the broker's discovery tools.
+	specs := specsFor(cfg)
+	var connectors []string
+	for _, n := range all {
+		if sp := specs[n]; sp != nil {
+			if !sp.ForClient(client) {
+				continue
+			}
+			if sp.OnDemand() && mode != "single" {
+				continue
+			}
+		}
+		connectors = append(connectors, n)
+	}
 	base := "http://" + cfg.FrontAddr()
 	if mode == "single" {
 		url := base + "/mcp"

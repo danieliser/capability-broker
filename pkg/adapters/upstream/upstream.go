@@ -361,7 +361,7 @@ func (a *Adapter) Tools(ctx context.Context, g *auth.Grant) ([]catalog.Tool, err
 	owner := g.Capabilities.IsOwner()
 	out := make([]catalog.Tool, 0, len(tools))
 	for _, t := range tools {
-		if !conn.ToolExposed(t.Name) {
+		if !conn.ToolExposed(t.Name) || !a.spec.Tools.Allows(t.Name) {
 			continue
 		}
 		if !owner && !reachable(conn.OperationsFor(t.Name), cap) {
@@ -476,6 +476,9 @@ func (a *Adapter) transform(name string, t catalog.Tool, cap auth.ConnectorCapab
 // Execute runs the guards, forwards the call to the child with a progress token
 // for the relay, then runs the response hooks and shapes the result.
 func (a *Adapter) Execute(ctx context.Context, call adapter.Call) (*adapter.Result, error) {
+	if !a.spec.Tools.Allows(call.Tool) {
+		return nil, &adapter.UpstreamError{Code: "BROKER_TOOL_NOT_EXPOSED", Message: call.Tool + " is excluded by the connector's tools filter"}
+	}
 	s, _, err := a.ensure(ctx)
 	if err != nil {
 		return nil, err
@@ -505,6 +508,14 @@ func (a *Adapter) Execute(ctx context.Context, call adapter.Call) (*adapter.Resu
 		}
 		a.dropSession()
 		return nil, adapter.Unavailable(a.spec.Name + " call failed: " + adapter.Truncate(err.Error(), 200))
+	}
+	if a.spec.Response.AppliesTo(call.Tool) {
+		if res, err = filterResult(cctx, res, a.spec.Response); err != nil {
+			return nil, adapter.Failed(a.spec.Name + " response filter: " + adapter.Truncate(err.Error(), 300))
+		}
+	}
+	if a.spec.Strips("structured") {
+		res.StructuredContent = nil
 	}
 	if call.Grant != nil && call.Grant.Capabilities.IsOwner() {
 		// Owner clients get the upstream result exactly as sent, as they would without the broker.
