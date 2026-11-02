@@ -49,3 +49,18 @@ connectors:
   #   command: gog
   #   args: [--account, work, --readonly, --gmail-no-send, mcp, --allow-tool, gmail]
   #   owner_only: true
+  # Shaping, per connector (all optional):
+  # metabase:
+  #   command: uv
+  #   args: [--directory, /path/to/metabase-mcp, run, src/metabase_mcp_server.py]
+  #   expose: broker                 # not preloaded: found via search_tools / describe_tool / call_tool
+  #   clients: [claude-code, codex]  # or [!cursor]
+  #   tools:
+  #     exclude: ["delete_*"]        # globs; hidden and refused for every caller
+  #   strip: [outputSchema, meta]
+  #   response:
+  #     drop_keys: [_links, debug]
+  #     compact: true
+  #     max_chars: 20000
+  #     command: [jq, -c, "."]       # external filter: result JSON in, result JSON or text out
+  #     tools: ["get_*"]             # limit the response filter to these tools

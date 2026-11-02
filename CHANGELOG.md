@@ -4,6 +4,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-02
+
+- `expose: broker` keeps a connector inside the broker for owner clients: no client entry and no preloaded tools, found and run through three discovery tools on the broker entry (`search_tools`, `describe_tool`, `call_tool`). `expose: passthrough` (default) keeps its own entry. Measured: Haiku 5.5 low 3/3 and GPT-6 Luna low (Codex, which drops server instructions) 3/3 found and used an on-demand Metabase tool.
+- `clients:` limits which owner clients get a connector (`[claude-code, codex]`, `[!cursor]`).
+- `tools: {include, exclude}` globs filter a connector's tools for every caller; excluded tools are hidden and refused.
+- `strip:` removes `outputSchema`, `annotations`, `title`, `icons`, `meta`, `instructions` or `structured` (structuredContent) from what clients see.
+- `response:` filters results for every caller: `drop_keys`, `compact` (with `max_string`, `max_items`), `command` (an external filter: MCP result JSON on stdin, result or text on stdout; failure fails the call), `max_chars`, optionally limited to `tools` globs.
+- `brokerd auth <prefix>` signs in every connector starting with it (`brokerd auth cloudflare`); `brokerd auth` lists connectors that need sign-in.
+
 ## [0.7.1] - 2026-11-02
 
 - Per-server client entries (`--mode servers`) use the name the client knew a server by when it was adopted under a different connector name (`openaiDeveloperDocs` → connector `openai-docs`), so tool names and rules keyed to them are unchanged. Owner clients default to this mode for full transparency; agents keep the single `broker` server.
