@@ -7,6 +7,8 @@
 package catalog
 
 import (
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
@@ -38,6 +40,9 @@ type Tool struct {
 	Name        string         `json:"name"`
 	Description string         `json:"description"`
 	InputSchema map[string]any `json:"inputSchema"`
+	// Upstream is the tool exactly as the upstream server declared it (title, annotations, output schema,
+	// icons, _meta); owner clients get it verbatim.
+	Upstream *mcp.Tool `json:"-"`
 }
 
 // Operation is the stable policy key a (tool, argument pattern) resolves to.

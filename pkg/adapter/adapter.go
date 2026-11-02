@@ -39,6 +39,9 @@ const (
 // Result is what an adapter returns. Compact is the default response body;
 // Verbose the full upstream payload (already redacted).
 type Result struct {
+	// Raw is the upstream result untouched (content blocks, structuredContent, isError, _meta). Set for owner
+	// grants, which see exactly what the upstream server returns.
+	Raw               *mcp.CallToolResult
 	Compact           any
 	Verbose           any
 	Outcome           Outcome
