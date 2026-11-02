@@ -20,6 +20,10 @@ interactive sessions share ClickHouse, a WordPress fleet and a memory service. T
   endpoints. Sessionless Streamable HTTP (MCP 2026-07-28) by default, verified with Claude Code 2.1.316, Codex 0.166
   and the Go SDK client; `--stateless=false` keeps `Mcp-Session-Id` sessions for older clients. `tools/list` returns
   the upstream tool definitions filtered to what the caller's grant allows, plus one additive `verbose` flag.
+- **Invisible to its owner.** Owner client tokens see each upstream exactly as if connected directly: tool
+  definitions (annotations, output schemas, titles), results (all content blocks, `structuredContent`, `isError`)
+  and the upstream's own instructions pass through untouched. Policy, compaction and the `verbose` flag apply to
+  agent grants only. Prompts and resources are not passed through yet (logged when an upstream has any).
 - **Grants, not credentials.** A caller holds a random bearer (`cbg_…` for agents, `cbc_…` for owner clients)
   bound to a capability set: named queries, sites, operations, namespaces, limits. Hashes at rest, revocation
   checked on every call, child grants can only narrow. Agent grants are minted by the control plane (PERSIST)

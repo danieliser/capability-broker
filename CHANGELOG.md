@@ -4,6 +4,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-02
+
+- Owner clients see upstream servers as if connected directly: tool definitions verbatim (title, annotations such as `readOnlyHint`/`destructiveHint`, output schema, icons, `_meta`), results verbatim (every content block, `structuredContent`, upstream `isError`), arguments passed through untouched, and each upstream server's own MCP instructions instead of the broker's. Agents keep policy, compaction and the `verbose` flag.
+- A server's instructions follow its connectors: when an upstream finishes starting (or is added), new sessions get the updated instructions.
+- `brokerd-probe -raw` prints instructions, tool definitions and results as JSON.
+- The broker logs upstreams that offer prompts or resources, which it does not pass through yet.
+
 - WordPress drafts admit only the supported `core/create-post` and `gk-block-mcp/create-post` schemas, with draft status forced and post type/site/run limits checked. Update abilities no longer resolve as drafting: forcing draft on an update could unpublish a live post.
 - Block MCP `resolve-url` maps to `content.read`; `get-page-blocks` forces `persist_refs: false` so a read cannot silently persist block references.
 

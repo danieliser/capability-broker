@@ -248,8 +248,10 @@ func (a *Adapter) ensure(ctx context.Context) (*mcp.ClientSession, *catalog.Conn
 					nt = len(r.ResourceTemplates)
 				}
 			}
-			a.log("connector offers features the broker does not pass through", "connector", a.spec.Name,
-				"prompts", np, "resources", nr, "resource_templates", nt)
+			if np > 0 || nr > 0 || nt > 0 {
+				a.log("connector offers features the broker does not pass through", "connector", a.spec.Name,
+					"prompts", np, "resources", nr, "resource_templates", nt)
+			}
 		}
 	}
 	a.ready.Store(true)
