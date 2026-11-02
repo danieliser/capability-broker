@@ -68,6 +68,29 @@ func TestOverlayDirReplacesEmbedded(t *testing.T) {
 	}
 }
 
+func TestBlockMCPDraftIsCreateOnly(t *testing.T) {
+	c, err := Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wp, _ := c.Connector("wp-mcp-router")
+	for _, name := range []string{"get-page-blocks", "get-post-info", "resolve-url"} {
+		op, ok := wp.Resolve("wp_run", map[string]any{"ability_name": "gk-block-mcp/" + name})
+		if !ok || op.ID != "wordpress.content.read" {
+			t.Fatalf("%s must resolve as content.read: %+v", name, op)
+		}
+	}
+	op, ok := wp.Resolve("wp_run", map[string]any{"ability_name": "gk-block-mcp/create-post"})
+	if !ok || op.ID != "wordpress.content.draft" {
+		t.Fatalf("Block MCP create-post must resolve as content.draft: %+v", op)
+	}
+	for _, name := range []string{"core/update-post", "gk-block-mcp/update-post", "gk-block-mcp/update-blocks", "gk-block-mcp/delete-post", "unknown/create-post"} {
+		if op, ok := wp.Resolve("wp_run", map[string]any{"ability_name": name, "arguments": map[string]any{"post_id": 468162, "post_type": "docs", "status": "draft"}}); ok {
+			t.Fatalf("%s must be refused before upstream execution: %+v", name, op)
+		}
+	}
+}
+
 func TestPushQueries(t *testing.T) {
 	c, _ := Load("")
 	v0 := c.PolicyVersion()

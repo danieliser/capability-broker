@@ -179,3 +179,31 @@ func TestMemoryNamespaces(t *testing.T) {
 		t.Fatalf("store allowed on recall-only grant: %+v", d)
 	}
 }
+
+func TestBlockMCPRefresherGrant(t *testing.T) {
+	f := setup(t)
+	g := f.agent(t, auth.Capabilities{"wp-mcp-router": {Sites: []string{"wppopupmaker"}, Operations: []string{"content.read", "content.draft"},
+		Limits: map[string]float64{"max_drafts_per_run": 1, "calls_per_run": 30}, Constraints: map[string]any{"post_types": []any{"docs"}}}})
+	for _, name := range []string{"get-post-info", "get-page-blocks", "resolve-url"} {
+		d := f.eval(t, g, "wp-mcp-router", "wp_run", map[string]any{"ability_name": "gk-block-mcp/" + name, "site": "wppopupmaker"})
+		if !d.Allow {
+			t.Fatalf("%s denied: %+v", name, d)
+		}
+	}
+	for _, pt := range []string{"", "post", "page"} {
+		d := f.eval(t, g, "wp-mcp-router", "wp_run", map[string]any{"ability_name": "gk-block-mcp/create-post", "site": "wppopupmaker", "arguments": map[string]any{"title": "x", "post_type": pt}})
+		if d.Allow || d.Code != CodeDeniedArgument {
+			t.Fatalf("non-doc draft %q admitted: %+v", pt, d)
+		}
+	}
+	d := f.eval(t, g, "wp-mcp-router", "wp_run", map[string]any{"ability_name": "gk-block-mcp/create-post", "site": "other", "arguments": map[string]any{"title": "x", "post_type": "docs"}})
+	if d.Allow {
+		t.Fatal("other site admitted")
+	}
+	for i := 0; i < 2; i++ {
+		d = f.eval(t, g, "wp-mcp-router", "wp_run", map[string]any{"ability_name": "gk-block-mcp/create-post", "site": "wppopupmaker", "arguments": map[string]any{"title": "x", "post_type": "docs"}})
+		if i == 0 && !d.Allow || i == 1 && (d.Allow || d.Code != CodeLimitExceeded) {
+			t.Fatalf("draft attempt %d: %+v", i+1, d)
+		}
+	}
+}

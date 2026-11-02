@@ -4,6 +4,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+- WordPress drafts admit only the supported `core/create-post` and `gk-block-mcp/create-post` schemas, with draft status forced and post type/site/run limits checked. Update abilities no longer resolve as drafting: forcing draft on an update could unpublish a live post.
+- Block MCP `resolve-url` maps to `content.read`; `get-page-blocks` forces `persist_refs: false` so a read cannot silently persist block references.
+
 ## [0.6.2] - 2026-11-02
 
 - Codex per-tool settings under the broker entry (`[mcp_servers.broker.tools."<tool>"] approval_mode`) survive client syncs; they were rewritten away with the entry.

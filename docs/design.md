@@ -144,7 +144,8 @@ queries:          # overlay, pushed per project; `@scheduler.freshness` resolves
 
 Operation ids are stable; `policy_version` is the digest of the catalog plus overlay in force at call time
 and is written on every receipt. WordPress operations map `wp_run{ability_name}` onto `content.read`
-(`core/get-post`, `core/list-posts`, …), `content.draft` (`core/create-post` with `status=draft` forced),
+(`core/get-post`, `core/list-posts`, Block MCP `get-post-info`, `get-page-blocks`, `resolve-url`, …),
+`content.draft` (only `core/create-post` and `gk-block-mcp/create-post`, with `status=draft` forced),
 `site.read`; anything else on `wp_run` is denied by name. Memory operations map `recall_memory` →
 `memory.recall` and `store_memory` → `memory.store`, both namespace-enforced on the way in (tags forced) and on
 the way out (results outside the namespace dropped, including graph expansion).

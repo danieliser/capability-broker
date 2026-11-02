@@ -64,6 +64,17 @@ func (a *Adapter) guard(ctx context.Context, s *mcp.ClientSession, name string, 
 			return adapter.Denied("INTO OUTFILE and SETTINGS clauses are not permitted")
 		}
 		return nil
+	case "wordpress_read_only":
+		// Block MCP assigns and persists block refs by default, even for a read.
+		if args["ability_name"] == "gk-block-mcp/get-page-blocks" {
+			inner, _ := args["arguments"].(map[string]any)
+			if inner == nil {
+				inner = map[string]any{}
+			}
+			inner["persist_refs"] = false
+			args["arguments"] = inner
+		}
+		return nil
 	case "force_draft_status":
 		inner, _ := args["arguments"].(map[string]any)
 		if inner == nil {

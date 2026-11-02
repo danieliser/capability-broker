@@ -229,6 +229,36 @@ func TestSynthesizedCatalogForUnknownConnector(t *testing.T) {
 	}
 }
 
+func TestBlockMCPDraftStatusAndReadSideEffects(t *testing.T) {
+	body := strings.Repeat("<!-- wp:paragraph --><p>full markup</p><!-- /wp:paragraph -->", 100)
+	child := &fakeChild{reply: func(_ string, args map[string]any) any {
+		return map[string]any{"site": args["site"], "result": map[string]any{"content": []any{map[string]any{"type": "text", "text": `{"success":true,"data":{"post_id":7,"post_status":"draft"}}`}}}}
+	}}
+	a, cat := adapterWith(t, "wp-mcp-router", child, "wp_run", "wp_get_ability")
+	g := agent(auth.Capabilities{"wp-mcp-router": {Sites: []string{"wppopupmaker"}, Operations: []string{"content.read", "content.draft"}, Constraints: map[string]any{"post_types": []any{"docs"}}}})
+	for _, status := range []string{"", "publish", "future", "private", "pending", "draft"} {
+		_, err := run(t, a, cat, g, "wp_run", map[string]any{"site": "wppopupmaker", "ability_name": "gk-block-mcp/create-post",
+			"arguments": map[string]any{"post_type": "docs", "title": "Refresh", "content": body, "status": status}}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		inner := child.last["arguments"].(map[string]any)
+		if inner["status"] != "draft" || inner["post_type"] != "docs" || inner["content"] != body {
+			t.Fatalf("unsafe or truncated create arguments for status %q", status)
+		}
+	}
+	for _, refs := range []any{nil, true, false} {
+		_, err := run(t, a, cat, g, "wp_run", map[string]any{"site": "wppopupmaker", "ability_name": "gk-block-mcp/get-page-blocks", "compact": false,
+			"arguments": map[string]any{"post_id": 468162, "persist_refs": refs}}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if child.last["arguments"].(map[string]any)["persist_refs"] != false || child.last["compact"] != false {
+			t.Fatalf("read must not persist refs or compact markup: %+v", child.last)
+		}
+	}
+}
+
 func TestSiteHostsNeverWaitsOnChildStartup(t *testing.T) {
 	cat, _ := catalog.Load("")
 	a := New(&connectors.Spec{Name: "wp-mcp-router", Command: "unused"}, cat, nil)

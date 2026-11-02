@@ -1,7 +1,7 @@
 # Policy for `wp-mcp-router` (tools discovered at runtime). wp_run_across (fan-out to many sites) reaches
 # owner clients; an agent needs the `run_across` operation explicitly.
 connector: wp-mcp-router
-version: 3
+version: 4
 adapter_version: "2.0"
 tool_transforms: [narrow_site_enum]   # the `site` enum shows only the grant's sites
 site_hosts_tool: wp_list_sites        # learned at connect time for URL policy
@@ -9,16 +9,18 @@ operations:
   # Specific wp_run operations first: the ability name selects the operation.
   - id: wordpress.content.read
     tool: wp_run
-    match: { ability_name: "^(core/(get-post|list-posts|get-site-info|list-post-types|get-taxonomy|list-terms|get-term|get-media|list-media|get-user|list-users)|[a-z0-9-]+/(get|list|search|find|read|render|analyze|preview|check)-[a-z0-9-]+)$" }
+    match: { ability_name: "^(core/(get-post|list-posts|get-site-info|list-post-types|get-taxonomy|list-terms|get-term|get-media|list-media|get-user|list-users)|gk-block-mcp/resolve-url|[a-z0-9-]+/(get|list|search|find|read|render|analyze|preview|check)-[a-z0-9-]+)$" }
     risk: read
     requires_capability: operations:content.read
     constraints: [sites, calls_per_run]
-    guards: [compact_request]
+    guards: [wordpress_read_only, compact_request]
     response: [site_result]
     compact: { fields: [id, status, type, title, link, modified, date, slug] }
   - id: wordpress.content.draft
     tool: wp_run
-    match: { ability_name: "^(core/(create-post|update-post)|[a-z0-9-]+/(create|update)-(post|page|guide|draft)[a-z0-9-]*)$" }
+    # Draft means a NEW post. Forcing status on an update would unpublish a live document.
+    # Only schemas whose status/post_type arguments we support are admitted.
+    match: { ability_name: "^(core/create-post|gk-block-mcp/create-post)$" }
     risk: reversible
     requires_capability: operations:content.draft
     constraints: [sites, post_types, max_drafts_per_run, calls_per_run]
