@@ -183,7 +183,14 @@ func (f *Front) authenticate(r *http.Request) (*auth.Grant, string, string) {
 // serverFor returns the stable server for (endpoint, grant, exclude), creating and populating it once.
 func (f *Front) serverFor(ctx context.Context, endpoint string, g *auth.Grant, exclude []string, plain, noInstructions, hint bool) *mcp.Server {
 	sort.Strings(exclude)
-	key := endpoint + "|" + g.ID + "|" + strings.Join(exclude, ",") + fmt.Sprintf("|plain=%v|noinst=%v|hint=%v", plain, noInstructions, hint)
+	instructions := ""
+	if !noInstructions {
+		instructions = f.instructions(endpoint, g, exclude)
+	}
+	// Instructions are fixed per MCP server, and upstreams supply theirs only once connected: a change (a
+	// connector finished starting, or was added) gets a fresh server for new sessions instead of stale text.
+	sum := sha256.Sum256([]byte(instructions))
+	key := endpoint + "|" + g.ID + "|" + strings.Join(exclude, ",") + fmt.Sprintf("|plain=%v|noinst=%v|hint=%v|ins=%x", plain, noInstructions, hint, sum[:6])
 	f.mu.Lock()
 	if f.servers == nil {
 		f.servers = map[string]*liveServer{}
@@ -195,7 +202,7 @@ func (f *Front) serverFor(ctx context.Context, endpoint string, g *auth.Grant, e
 			name = "broker"
 		}
 		ls = &liveServer{server: mcp.NewServer(&mcp.Implementation{Name: name, Version: "1"}, &mcp.ServerOptions{Logger: f.Logger,
-			Instructions: map[bool]string{false: f.instructions(endpoint, g, exclude), true: ""}[noInstructions],
+			Instructions: instructions,
 			// Declared up front: a server that starts with no tools (an aggregate whose connectors are all
 			// excluded, or still starting) must still tell the client it has tools and will announce changes.
 			Capabilities: &mcp.ServerCapabilities{Tools: &mcp.ToolCapabilities{ListChanged: true}}}),
