@@ -234,8 +234,22 @@ func (a *Adapter) ensure(ctx context.Context) (*mcp.ClientSession, *catalog.Conn
 		a.instructions.Store(&in)
 		if c := ir.Capabilities; c != nil && (c.Prompts != nil || c.Resources != nil || c.Completions != nil) {
 			// Not proxied yet: only tools reach clients through the broker.
+			np, nr, nt := -1, -1, -1
+			if c.Prompts != nil {
+				if r, err := session.ListPrompts(cctx, nil); err == nil {
+					np = len(r.Prompts)
+				}
+			}
+			if c.Resources != nil {
+				if r, err := session.ListResources(cctx, nil); err == nil {
+					nr = len(r.Resources)
+				}
+				if r, err := session.ListResourceTemplates(cctx, nil); err == nil {
+					nt = len(r.ResourceTemplates)
+				}
+			}
 			a.log("connector offers features the broker does not pass through", "connector", a.spec.Name,
-				"prompts", c.Prompts != nil, "resources", c.Resources != nil, "completions", c.Completions != nil)
+				"prompts", np, "resources", nr, "resource_templates", nt)
 		}
 	}
 	a.ready.Store(true)
