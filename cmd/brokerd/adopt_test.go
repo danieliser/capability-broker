@@ -109,3 +109,19 @@ func TestSetDisabled(t *testing.T) {
 		t.Fatalf("got:\n%s", got)
 	}
 }
+
+func TestReinsertWhenBackupStripped(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "d.json")
+	_ = os.WriteFile(path, []byte(`{"mcpServers":{"broker":{"command":"node","args":["p.js","http://127.0.0.1:8890/mcp"]}}}`), 0o600)
+	ok, err := reinsertJSON(path, "mcpServers", "a", json.RawMessage(`{"command":"x"}`))
+	if !ok || err != nil {
+		t.Fatalf("%v %v", ok, err)
+	}
+	doc, _ := readJSONC(path)
+	if _, ok := doc["mcpServers"].(map[string]any)["a"]; !ok {
+		t.Fatal("not reinserted")
+	}
+	if !isBrokerEntry(doc["mcpServers"].(map[string]any)["broker"]) {
+		t.Fatal("stdio bridge should count as a broker entry")
+	}
+}

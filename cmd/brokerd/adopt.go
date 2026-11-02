@@ -191,6 +191,13 @@ func runClientRestore(ctx context.Context, args []string) int {
 				continue
 			}
 			ok, err := c.unpark(path, name)
+			if err == nil && !ok && c.format == "json" {
+				// Some clients (Claude Desktop) rewrite their config and drop unknown keys, taking the in-file
+				// backup with them; the broker's own record still has the original entry.
+				if rec := adopted[name]; rec != nil && rec.Entries[c.name] != nil {
+					ok, err = reinsertJSON(path, c.key, name, rec.Entries[c.name])
+				}
+			}
 			if err != nil {
 				fmt.Printf("%-24s %s: %v\n", name, c.name, err)
 				failed++
@@ -543,6 +550,29 @@ func unparkJSON(key string, inPlace bool) func(path, name string) (bool, error) 
 		}
 		return true, writeIfUnchanged(path, before, doc)
 	}
+}
+
+// reinsertJSON puts an adopted entry back into a JSON client's server map, unless the client already has one.
+func reinsertJSON(path, key, name string, raw json.RawMessage) (bool, error) {
+	before, _ := os.Stat(path)
+	doc, err := readJSONC(path)
+	if err != nil {
+		return false, err
+	}
+	servers, _ := doc[key].(map[string]any)
+	if servers == nil {
+		servers = map[string]any{}
+	}
+	if _, has := servers[name]; has {
+		return false, nil
+	}
+	var v any
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return false, err
+	}
+	servers[name] = v
+	doc[key] = servers
+	return true, writeIfUnchanged(path, before, doc)
 }
 
 func writeIfUnchanged(path string, before os.FileInfo, doc map[string]any) error {
