@@ -476,9 +476,21 @@ func buildEntries(cfg config.Config, connectors []string, token, mode, prefix st
 		}
 		return []entry{{Name: "broker", URL: url, Token: token}}
 	}
+	// A server adopted under a different connector name (openaiDeveloperDocs → openai-docs) keeps the name the
+	// client knew it by, so tool names and every rule keyed to them stay as they were.
+	alias := map[string]string{}
+	for orig, rec := range loadAdopted(cfg) {
+		if rec != nil && rec.Connector != "" && rec.Connector != orig {
+			alias[rec.Connector] = orig
+		}
+	}
 	var entries []entry
 	for _, name := range connectors {
-		entries = append(entries, entry{Name: name, URL: base + "/mcp/" + name, Token: token})
+		clientName := name
+		if a, ok := alias[name]; ok {
+			clientName = a
+		}
+		entries = append(entries, entry{Name: clientName, URL: base + "/mcp/" + name, Token: token})
 	}
 	return append(entries, entry{Name: "broker", URL: base + "/mcp?exclude=" + strings.Join(connectors, ","), Token: token})
 }

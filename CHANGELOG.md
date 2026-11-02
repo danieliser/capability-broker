@@ -4,6 +4,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-02
+
+- Per-server client entries (`--mode servers`) use the name the client knew a server by when it was adopted under a different connector name (`openaiDeveloperDocs` → connector `openai-docs`), so tool names and rules keyed to them are unchanged. Owner clients default to this mode for full transparency; agents keep the single `broker` server.
+
 ## [0.7.0] - 2026-11-02
 
 - Owner clients see upstream servers as if connected directly: tool definitions verbatim (title, annotations such as `readOnlyHint`/`destructiveHint`, output schema, icons, `_meta`), results verbatim (every content block, `structuredContent`, upstream `isError`), arguments passed through untouched, and each upstream server's own MCP instructions instead of the broker's. Agents keep policy, compaction and the `verbose` flag.
