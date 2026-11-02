@@ -23,6 +23,10 @@ type client struct {
 	path   func(home string) string
 	apply  func(path string, entries []entry, revert map[string]json.RawMessage) (backup map[string]json.RawMessage, err error)
 	format string
+	key    string // JSON server map key
+	// park removes a server the broker has adopted, keeping a restorable copy in the file; unpark restores it.
+	park   func(path, name string) (json.RawMessage, error)
+	unpark func(path, name string) (bool, error)
 }
 
 type entry struct {
@@ -32,10 +36,33 @@ type entry struct {
 }
 
 var clients = []client{
-	{name: "claude-code", format: "json", path: func(h string) string { return filepath.Join(h, ".claude.json") }, apply: applyJSONServers("mcpServers", claudeEntry)},
-	{name: "cursor", format: "json", path: func(h string) string { return filepath.Join(h, ".cursor", "mcp.json") }, apply: applyJSONServers("mcpServers", cursorEntry)},
-	{name: "opencode", format: "json", path: func(h string) string { return filepath.Join(h, ".config", "opencode", "opencode.jsonc") }, apply: applyJSONServers("mcp", opencodeEntry)},
-	{name: "codex", format: "toml", path: func(h string) string { return filepath.Join(h, ".codex", "config.toml") }, apply: applyCodex},
+	{name: "claude-code", format: "json", key: "mcpServers", path: func(h string) string { return filepath.Join(h, ".claude.json") },
+		apply: applyJSONServers("mcpServers", claudeEntry), park: parkJSON("mcpServers", false), unpark: unparkJSON("mcpServers", false)},
+	{name: "claude-desktop", format: "json", key: "mcpServers", path: func(h string) string {
+		return filepath.Join(h, "Library", "Application Support", "Claude", "claude_desktop_config.json")
+	}, apply: applyJSONServers("mcpServers", desktopEntry), park: parkJSON("mcpServers", false), unpark: unparkJSON("mcpServers", false)},
+	{name: "cursor", format: "json", key: "mcpServers", path: func(h string) string { return filepath.Join(h, ".cursor", "mcp.json") },
+		apply: applyJSONServers("mcpServers", cursorEntry), park: parkJSON("mcpServers", false), unpark: unparkJSON("mcpServers", false)},
+	{name: "opencode", format: "json", key: "mcp", path: func(h string) string { return filepath.Join(h, ".config", "opencode", "opencode.jsonc") },
+		apply: applyJSONServers("mcp", opencodeEntry), park: parkJSON("mcp", true), unpark: unparkJSON("mcp", true)},
+	{name: "codex", format: "toml", path: func(h string) string { return filepath.Join(h, ".codex", "config.toml") }, apply: applyCodex,
+		park: parkCodex, unpark: unparkCodex},
+}
+
+// desktopEntry: Claude Desktop's config takes stdio servers only, so it reaches the broker through mcp-remote.
+// The token travels in the child's env, not its argv.
+func desktopEntry(e entry) any {
+	home, _ := os.UserHomeDir()
+	node := "/opt/homebrew/bin/node"
+	for _, p := range []string{"/opt/homebrew/bin/node", "/usr/local/bin/node"} {
+		if _, err := os.Stat(p); err == nil {
+			node = p
+			break
+		}
+	}
+	proxy := filepath.Join(home, ".local", "share", "mcp-clients", "node_modules", "mcp-remote", "dist", "proxy.js")
+	return map[string]any{"command": node, "args": []any{proxy, e.URL, "--transport", "http-only", "--header", "Authorization:${BROKER_AUTHORIZATION}"},
+		"env": map[string]any{"BROKER_AUTHORIZATION": "Bearer " + e.Token}}
 }
 
 func claudeEntry(e entry) any {
@@ -60,7 +87,7 @@ func runClientInstall(ctx context.Context, args []string) int {
 		target, args = args[0], args[1:]
 	}
 	if err := fs.Parse(args); err != nil || target == "" || (*mode != "single" && *mode != "servers") || (*prefix != "connector" && *prefix != "none") {
-		return fail("usage: brokerd client install <claude-code|codex|cursor|opencode|all> [--connectors a,b] [--revert]")
+		return fail("usage: brokerd client install <claude-code|claude-desktop|codex|cursor|opencode|all> [--connectors a,b] [--revert]")
 	}
 	cfg := config.FromEnv()
 	home, _ := os.UserHomeDir()
@@ -263,6 +290,13 @@ func applyJSONServers(key string, render func(entry) any) func(string, []entry, 
 func isBrokerEntry(v any) bool {
 	m, _ := v.(map[string]any)
 	u, _ := m["url"].(string)
+	if u == "" { // stdio bridge (Claude Desktop): the broker URL is an argument
+		for _, a := range stringSlice(m["args"]) {
+			if strings.HasPrefix(a, "http://127.0.0.1:") {
+				u = a
+			}
+		}
+	}
 	return strings.HasPrefix(u, "http://127.0.0.1:") && strings.Contains(u, "/mcp")
 }
 

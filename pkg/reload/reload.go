@@ -11,6 +11,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,6 +26,7 @@ import (
 	"github.com/danieliser/capability-broker/pkg/mcpfront"
 	"github.com/danieliser/capability-broker/pkg/pins"
 	"github.com/danieliser/capability-broker/pkg/registry"
+	"github.com/danieliser/capability-broker/pkg/remoteauth"
 )
 
 type Logger func(msg string, kv ...any)
@@ -42,6 +44,8 @@ type Reloader struct {
 	OnConnectorsChanged func(names []string)
 	// Pins swaps npx/uvx commands for pinned installs; nil disables pinning.
 	Pins *pins.Manager
+	// Auth signs url connectors in with OAuth.
+	Auth *remoteauth.Manager
 
 	mu        sync.Mutex
 	digests   map[string]string // connector → spec digest
@@ -107,6 +111,7 @@ func (r *Reloader) Apply(ctx context.Context) (Result, error) {
 			continue
 		}
 		ad := upstream.New(spec, r.Catalog, r.Log)
+		ad.Auth = r.Auth
 		prev := r.Registry.Set(name, ad)
 		r.digests[name] = d
 		if prev != nil {
@@ -165,6 +170,10 @@ func (r *Reloader) startWithRetry(ctx context.Context, name string, ad *upstream
 		if cur, ok := r.Registry.Lookup(name); !ok || cur != ad {
 			return // replaced or removed while starting
 		}
+		if errors.Is(err, remoteauth.ErrNeedsAuth) {
+			r.log("connector needs sign-in; not retrying", "connector", name, "run", "brokerd auth "+name)
+			return
+		}
 		r.log("connector not started; retrying", "connector", name, "attempt", attempt, "retry_in", backoff.String(), "err", err.Error())
 		select {
 		case <-ctx.Done():
@@ -175,6 +184,24 @@ func (r *Reloader) startWithRetry(ctx context.Context, name string, ad *upstream
 			backoff *= 2
 		}
 	}
+}
+
+// Reconnect starts a connector again (after a sign-in) and refreshes live servers when it connects.
+func (r *Reloader) Reconnect(name string) error {
+	cur, ok := r.Registry.Lookup(name)
+	if !ok {
+		return fmt.Errorf("unknown connector %s", name)
+	}
+	ad, ok := cur.(*upstream.Adapter)
+	if !ok {
+		return fmt.Errorf("connector %s cannot reconnect", name)
+	}
+	base := r.Base
+	if base == nil {
+		base = context.Background()
+	}
+	go r.startWithRetry(base, name, ad)
+	return nil
 }
 
 // Watch polls the watched files and applies when their fingerprint changes. It returns when ctx ends.
@@ -221,11 +248,13 @@ func (r *Reloader) fingerprint() string {
 // digest covers everything that requires a child restart, including resolved secret values. Never logged.
 func digest(s *connectors.Spec) string {
 	b, _ := json.Marshal(struct {
-		Command, Cwd  string
-		Args          []string
-		Env           map[string]string
-		Startup, Call time.Duration
-	}{s.Command, s.Cwd, s.Args, s.Env, s.StartupTimeout, s.CallTimeout})
+		Command, Cwd, URL string
+		Args              []string
+		Env, Headers      map[string]string
+		OAuth             *connectors.OAuth
+		Startup, Call     time.Duration
+		OwnerOnly         bool
+	}{s.Command, s.Cwd, s.URL, s.Args, s.Env, s.Headers, s.OAuth, s.StartupTimeout, s.CallTimeout, s.OwnerOnly})
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
 }
