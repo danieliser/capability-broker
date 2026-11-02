@@ -132,6 +132,10 @@ func runClientAdopt(ctx context.Context, args []string) int {
 		if *dry {
 			continue
 		}
+		// A connector restored earlier is still in connectors.yaml, disabled; adopting it again turns it back on.
+		if entry != nil && existing[conn] {
+			_ = setDisabled(cfg.ConnectorsPath(), conn, false)
+		}
 		rec := adopted[name]
 		if rec == nil {
 			rec = &adoptRecord{Connector: conn, Source: src, AdoptedAt: time.Now(), Entries: map[string]json.RawMessage{}}
@@ -419,6 +423,9 @@ func setDisabled(path, name string, disabled bool) error {
 				m.Content[j+1].Value = fmt.Sprint(disabled)
 				goto write
 			}
+		}
+		if !disabled {
+			return nil // not disabled: nothing to change
 		}
 		m.Content = append(m.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: "disabled"}, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: fmt.Sprint(disabled)})
 		goto write

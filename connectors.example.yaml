@@ -30,3 +30,22 @@ connectors:
     env:
       WP_MCP_ROUTER_CONFIG: ~/.config/wp-mcp-router/sites.json
     startup_timeout: 120s
+  # A remote server with header credentials.
+  # cloudways:
+  #   url: https://mcp.cloudways.com/mcp/
+  #   headers:
+  #     X-CW-Api-Key: "${secret:CLOUDWAYS_API_KEY}"
+  # A remote server the broker signs in to (run `brokerd auth vercel` once).
+  # vercel:
+  #   url: https://mcp.vercel.com/
+  #   oauth: {}
+  # Scopes can be fixed instead of discovered:
+  # sofa:
+  #   url: https://agents.stackoverflow.com/mcp
+  #   oauth:
+  #     scopes: [sofa.read, sofa.identity.read]
+  # Owner-only: never granted to agents.
+  # gmail-work:
+  #   command: gog
+  #   args: [--account, work, --readonly, --gmail-no-send, mcp, --allow-tool, gmail]
+  #   owner_only: true
