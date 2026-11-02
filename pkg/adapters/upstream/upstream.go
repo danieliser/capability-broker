@@ -45,6 +45,8 @@ type Adapter struct {
 	tools     []catalog.Tool
 	conn      *catalog.Connector
 	connected time.Time
+	// instructions are the upstream server's own MCP instructions, passed on to owner clients.
+	instructions atomic.Pointer[string] // never behind mu: a start in progress must not block a client's connect
 
 	// Auth signs remote connectors in with OAuth; nil leaves oauth connectors unable to start.
 	Auth *remoteauth.Manager
@@ -64,6 +66,14 @@ func (a *Adapter) Connector() string { return a.spec.Name }
 
 // Spec is the connector definition this adapter was built from (the reloader diffs on it).
 func (a *Adapter) Spec() *connectors.Spec { return a.spec }
+
+// Instructions are the upstream server's own MCP instructions ("" until connected).
+func (a *Adapter) Instructions() string {
+	if p := a.instructions.Load(); p != nil {
+		return *p
+	}
+	return ""
+}
 
 // Ready reports whether the child is connected, without waiting on a start in progress.
 func (a *Adapter) Ready() bool { return a.ready.Load() }
@@ -219,6 +229,10 @@ func (a *Adapter) ensure(ctx context.Context) (*mcp.ClientSession, *catalog.Conn
 	}
 	conn := a.cat.Ensure(a.spec.Name, names)
 	a.session, a.tools, a.conn, a.connected = session, tools, conn, time.Now()
+	if ir := session.InitializeResult(); ir != nil {
+		in := ir.Instructions
+		a.instructions.Store(&in)
+	}
 	a.ready.Store(true)
 	a.log("connector connected", "connector", a.spec.Name, "tools", len(tools), "catalog", conn.Source)
 	if conn.SiteHostsTool != "" {
@@ -240,7 +254,7 @@ func discover(ctx context.Context, s *mcp.ClientSession) ([]catalog.Tool, error)
 			if raw, err := json.Marshal(t.InputSchema); err == nil {
 				_ = json.Unmarshal(raw, &schema)
 			}
-			out = append(out, catalog.Tool{Name: t.Name, Description: t.Description, InputSchema: schema})
+			out = append(out, catalog.Tool{Name: t.Name, Description: t.Description, InputSchema: schema, Upstream: t})
 		}
 		if res.NextCursor == "" {
 			break
@@ -470,6 +484,14 @@ func (a *Adapter) Execute(ctx context.Context, call adapter.Call) (*adapter.Resu
 		}
 		a.dropSession()
 		return nil, adapter.Unavailable(a.spec.Name + " call failed: " + adapter.Truncate(err.Error(), 200))
+	}
+	if call.Grant != nil && call.Grant.Capabilities.IsOwner() {
+		// Owner clients get the upstream result exactly as sent, as they would without the broker.
+		outcome := "ok"
+		if res.IsError {
+			outcome = "upstream_is_error"
+		}
+		return &adapter.Result{Raw: res, Outcome: adapter.OutcomeCompleted, OutcomeClass: outcome, Account: accountOf(args)}, nil
 	}
 	payload := payloadOf(res)
 	if res.IsError {

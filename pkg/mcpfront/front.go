@@ -231,6 +231,9 @@ func (f *Front) instructions(endpoint string, g *auth.Grant, exclude []string) s
 	} else {
 		names = []string{endpoint}
 	}
+	if g.Capabilities.IsOwner() {
+		return f.ownerInstructions(names)
+	}
 	if len(names) == 0 {
 		return "Live connectors added to this server later appear as new tools; check your tool list when a task needs a system you do not see."
 	}
@@ -249,6 +252,31 @@ func (f *Front) instructions(endpoint string, g *auth.Grant, exclude []string) s
 	}
 	return "These tools are live connections to: " + strings.Join(parts, "; ") +
 		". When a question needs data, remembered facts or site information, call these tools instead of answering from the conversation; your workspace being read-only does not limit them."
+}
+
+// ownerInstructions passes each upstream server's own instructions through, as the client would have shown
+// them with the server connected directly. Nothing of the broker's own is added.
+func (f *Front) ownerInstructions(names []string) string {
+	var parts []string
+	for _, n := range names {
+		ad, ok := f.Registry.Lookup(n)
+		if !ok {
+			continue
+		}
+		ins, ok := ad.(interface{ Instructions() string })
+		if !ok {
+			continue
+		}
+		text := strings.TrimSpace(ins.Instructions())
+		if text == "" {
+			continue
+		}
+		if len(names) == 1 {
+			return text
+		}
+		parts = append(parts, "## "+n+"\n"+text)
+	}
+	return strings.Join(parts, "\n\n")
 }
 
 func liveAbout(connector string) string {
@@ -365,7 +393,27 @@ func (f *Front) refreshOne(ctx context.Context, ls *liveServer, initial bool) {
 			delete(ls.toolOwner, n)
 		}
 	}
+	owner := ls.grant.Capabilities.IsOwner()
 	for exported, d := range desired {
+		if owner && d.tool.Upstream != nil {
+			// Owner clients see the upstream tool exactly as declared (title, annotations, output schema,
+			// icons, _meta), under its exported name and with no broker arguments.
+			t := *d.tool.Upstream
+			t.Name = exported
+			raw, _ := json.Marshal(&t)
+			sum := sha256.Sum256(raw)
+			h := hex.EncodeToString(sum[:])
+			if ls.toolHash[exported] == h {
+				continue
+			}
+			connector, upstream := d.connector, d.upstream
+			ls.server.AddTool(&t, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return f.call(ctx, connector, upstream, req)
+			})
+			ls.toolHash[exported] = h
+			ls.toolOwner[exported] = connector
+			continue
+		}
 		if ls.hint {
 			d.tool.Description = "Live " + d.connector + " connection: " + liveAbout(d.connector) + ". " + d.tool.Description
 		}
@@ -466,8 +514,12 @@ func (f *Front) call(ctx context.Context, connector, tool string, req *mcp.CallT
 			return toolError(policy.CodeDeniedArgument, "arguments must be a JSON object"), nil
 		}
 	}
-	verbose, _ := args["verbose"].(bool)
-	delete(args, "verbose")
+	// `verbose` is the broker's own argument, offered to agents only; an owner's arguments go upstream as sent.
+	verbose := false
+	if !g.Capabilities.IsOwner() {
+		verbose, _ = args["verbose"].(bool)
+		delete(args, "verbose")
+	}
 	idem, _ := args["idempotency_key"].(string)
 	requestBytes := int64(len(req.Params.Arguments))
 
@@ -524,6 +576,13 @@ func (f *Front) call(ctx context.Context, connector, tool string, req *mcp.CallT
 		}
 		_ = f.Audit.Outcome(ctx, callID, base, audit.Outcome{State: state, OutcomeClass: code, Duration: time.Since(started)})
 		return toolError(code, msg), nil
+	}
+	if res.Raw != nil {
+		raw, _ := json.Marshal(res.Raw)
+		state := audit.StateCompleted
+		_ = f.Audit.Outcome(ctx, callID, base, audit.Outcome{State: state, OutcomeClass: res.OutcomeClass,
+			Duration: time.Since(started), ResponseBytes: int64(len(raw))})
+		return res.Raw, nil
 	}
 	body := res.Compact
 	if verbose {
