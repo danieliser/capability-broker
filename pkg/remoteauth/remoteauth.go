@@ -50,6 +50,10 @@ func HTTP1Transport() *http.Transport {
 	return t
 }
 
+func httpClient() *http.Client {
+	return &http.Client{Timeout: 30 * time.Second, Transport: uaTransport{base: HTTP1Transport()}}
+}
+
 type uaTransport struct{ base http.RoundTripper }
 
 func (t uaTransport) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -191,7 +195,7 @@ func (h *handler) build(spec *connectors.Spec) error {
 		RequestRefreshToken:      true,
 		AcceptUnadvertisedIss:    true,
 		AuthorizationCodeFetcher: h.fetch,
-		Client:                   &http.Client{Timeout: 30 * time.Second, Transport: uaTransport{base: HTTP1Transport()}},
+		Client:                   httpClient(),
 		NewTokenSource: func(ctx context.Context, c *oauth2.Config, t *oauth2.Token) (oauth2.TokenSource, error) {
 			s := &stored{ClientID: c.ClientID, ClientSecret: c.ClientSecret, AuthURL: c.Endpoint.AuthURL, TokenURL: c.Endpoint.TokenURL,
 				AuthStyle: int(c.Endpoint.AuthStyle), Scopes: c.Scopes, Token: t, SignedInAt: time.Now()}
@@ -241,7 +245,10 @@ func (h *handler) build(spec *connectors.Spec) error {
 
 // persisting refreshes through the token endpoint and writes each new token back to disk.
 func (h *handler) persisting(c *oauth2.Config, t *oauth2.Token, s *stored) oauth2.TokenSource {
-	base := oauth2.ReuseTokenSource(t, c.TokenSource(context.Background(), t))
+	// Refreshes must use the same HTTP/1.1 client as sign-in: the default client's HTTP/2 fingerprint is
+	// challenged by Cloudflare-fronted token endpoints (403 "Just a moment").
+	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, httpClient())
+	base := oauth2.ReuseTokenSource(t, c.TokenSource(ctx, t))
 	return &savingSource{base: base, last: t.AccessToken, save: func(nt *oauth2.Token) {
 		cp := *s
 		cp.Token = nt
