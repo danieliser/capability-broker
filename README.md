@@ -35,6 +35,15 @@ interactive sessions share ClickHouse, a WordPress fleet and a memory service. T
   an operation of its own name that an agent grant must list. Catalogs refer to small named hooks (resolve a
   named query, force `status: draft`, force namespace tags, filter a recall by namespace, narrow a `site` enum)
   rather than carrying code.
+- **Remote servers and sign-in.** A connector may be a remote Streamable HTTP server (`url:`, optional
+  `headers:` with `${secret:…}`) instead of a command. `oauth: {}` signs the broker in with OAuth 2.1 (protected
+  resource discovery, dynamic client registration, PKCE) once, with `brokerd auth <connector>`; the token and
+  refresh token live in `~/.brokerd/oauth/<connector>.json` (0600) and every client and agent uses that one
+  sign-in. A daemon never opens a browser by itself: without a token the connector reports
+  `needs sign-in: brokerd auth <name>` and stops retrying. Remote calls use HTTP/1.1 and send a broker
+  User-Agent, because Cloudflare bot protection challenges Go's default HTTP/2 client.
+- **Owner-only connectors.** `owner_only: true` serves a connector to owner client tokens only; minting an agent
+  grant that names it fails with `ADMIN_OWNER_ONLY`.
 - **Hot reload.** `connectors.yaml`, `secrets.json` and `catalog.d/*.yaml` are polled every 2 seconds (also
   `SIGHUP`, `brokerd reload`). Added connectors start, changed ones restart, removed ones stop; a file that fails to
   parse changes nothing. Every connected MCP session gets `tools/list_changed`, so an open chat sees the change.
@@ -84,7 +93,8 @@ brokerd grant list
 brokerd grant revoke <grant-id>
 
 # your own sessions: Claude Code, Codex, Cursor and OpenCode, each with its own owner token
-brokerd client install all                # or claude-code | codex | cursor | opencode
+brokerd client install all                # or claude-code | claude-desktop | codex | cursor | opencode
+#   Claude Desktop takes stdio servers only, so its `broker` entry runs mcp-remote with the token in env
 #   --mode single (default): one `broker` server carrying every connector; tools pass through
 #   --mode servers: one server entry per connector plus `broker` for connectors added later
 #   --prefix none (default): upstream tool names, prefixed only where two connectors clash; connector: <connector>__<tool>
@@ -95,6 +105,20 @@ brokerd client install all --revert       # restore the original entries
 # Installed clients are managed: when a connector is added or removed, the daemon updates each client's config.
 # An open chat reaches a new connector through `broker` (mcp__broker__<connector>__<tool>); the next chat sees it
 # as its own server with the upstream's tool names.
+
+# move servers your clients already run into the broker (Claude Code, Claude Desktop, Cursor, OpenCode, Codex).
+# Secrets in env/headers move to secrets.json; mcp-remote wrappers become native url connectors; a url that
+# answers 401 becomes an oauth connector. Each client keeps a restorable copy (mcpServersBackup in JSON configs,
+# enabled = false in Codex and OpenCode) and the broker keeps the originals in clients/adopted.json.
+brokerd client adopt dataforseo metabase openaiDeveloperDocs=openai-docs
+brokerd client adopt gmail-work gmail-personal --owner-only
+brokerd client adopt cloudflare-api vercel --dry-run      # print the connector definitions only
+brokerd client restore dataforseo                         # put it back in every client, disable it in the broker
+
+# sign the broker in to an oauth connector (opens the browser once)
+brokerd auth vercel
+brokerd auth vercel --force       # sign in again
+brokerd auth vercel --sign-out
 
 # apply config changes now instead of within 2s
 brokerd reload

@@ -20,8 +20,10 @@ import (
 	"github.com/danieliser/capability-broker/pkg/auth"
 	"github.com/danieliser/capability-broker/pkg/buildinfo"
 	"github.com/danieliser/capability-broker/pkg/catalog"
+	"github.com/danieliser/capability-broker/pkg/connectors"
 	"github.com/danieliser/capability-broker/pkg/mcpfront"
 	"github.com/danieliser/capability-broker/pkg/registry"
+	"github.com/danieliser/capability-broker/pkg/remoteauth"
 )
 
 type Admin struct {
@@ -36,6 +38,21 @@ type Admin struct {
 	DB       *sql.DB
 	FrontURL string // http://127.0.0.1:8890
 	Started  time.Time
+	// OAuth and Reconnect drive `brokerd auth`: sign a url connector in, then start it again.
+	OAuth     *remoteauth.Manager
+	Reconnect func(name string) error
+}
+
+// specOf returns the connector definition behind a registered adapter.
+func (a *Admin) specOf(name string) *connectors.Spec {
+	ad, ok := a.Registry.Lookup(name)
+	if !ok {
+		return nil
+	}
+	if s, ok := ad.(interface{ Spec() *connectors.Spec }); ok {
+		return s.Spec()
+	}
+	return nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -71,12 +88,19 @@ func (a *Admin) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/catalog/queries", a.auth(a.listQueries))
 	mux.HandleFunc("GET /v1/receipts", a.auth(a.receipts))
 	mux.HandleFunc("POST /v1/reload", a.auth(a.reload))
+	mux.HandleFunc("POST /v1/auth/{connector}", a.auth(a.beginAuth))
+	mux.HandleFunc("GET /v1/auth/{connector}", a.auth(a.authStatus))
+	mux.HandleFunc("DELETE /v1/auth/{connector}", a.auth(a.signOut))
 	return mux
 }
 
 func (a *Admin) status(w http.ResponseWriter, r *http.Request) {
 	health := map[string]string{}
 	for name, ad := range a.Registry.Snapshot() {
+		if sp := a.specOf(name); sp != nil && sp.OAuth != nil && a.OAuth != nil && a.OAuth.Status(name) != "signed_in" && !isReady(ad) {
+			health[name] = "needs sign-in: brokerd auth " + name
+			continue
+		}
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		if err := ad.Health(ctx); err != nil {
 			health[name] = "degraded: " + adapter.Truncate(err.Error(), 120)
@@ -137,6 +161,10 @@ func (a *Admin) mintGrant(w http.ResponseWriter, r *http.Request) {
 				writeErr(w, http.StatusBadRequest, "ADMIN_BAD_CAPABILITIES", "unknown connector "+name)
 				return
 			}
+			if sp := a.specOf(name); sp != nil && sp.OwnerOnly {
+				writeErr(w, http.StatusForbidden, "ADMIN_OWNER_ONLY", "connector "+name+" is owner-only and cannot be granted to agents")
+				return
+			}
 			if cap := c[name]; name == "clickhouse" {
 				for _, q := range cap.Queries {
 					if _, ok := a.Catalog.Query(q); !ok {
@@ -173,6 +201,71 @@ func (a *Admin) mintGrant(w http.ResponseWriter, r *http.Request) {
 	// servers for low-effort models, and new connectors arrive in it without a reconnect).
 	servers := map[string]string{"broker": a.FrontURL + "/mcp?prefix=none"}
 	writeJSON(w, http.StatusCreated, mintResponse{GrantID: g.ID, Token: token, ExpiresAt: g.ExpiresAt, Servers: servers, ConnectorServers: perConnector})
+}
+
+// beginAuth marks an OAuth connector interactive, reconnects it, and returns the authorization URL once the
+// handler has one (or signed_in when a stored token already works).
+func (a *Admin) beginAuth(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("connector")
+	sp := a.specOf(name)
+	if sp == nil || sp.OAuth == nil || a.OAuth == nil {
+		writeErr(w, http.StatusBadRequest, "ADMIN_NOT_OAUTH", name+" is not an oauth connector")
+		return
+	}
+	if r.URL.Query().Get("force") == "1" {
+		_ = a.OAuth.Forget(name)
+	}
+	if err := a.OAuth.Begin(sp); err != nil {
+		writeErr(w, http.StatusInternalServerError, "ADMIN_AUTH_FAILED", err.Error())
+		return
+	}
+	if ad, ok := a.Registry.Lookup(name); ok && isReady(ad) {
+		writeJSON(w, http.StatusOK, map[string]any{"connector": name, "status": "signed_in"})
+		return
+	}
+	if err := a.Reconnect(name); err != nil {
+		writeErr(w, http.StatusInternalServerError, "ADMIN_AUTH_FAILED", err.Error())
+		return
+	}
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		if u := a.OAuth.PendingURL(name); u != "" {
+			writeJSON(w, http.StatusOK, map[string]any{"connector": name, "status": "signing_in", "url": u})
+			return
+		}
+		if ad, ok := a.Registry.Lookup(name); ok && isReady(ad) {
+			writeJSON(w, http.StatusOK, map[string]any{"connector": name, "status": "signed_in"})
+			return
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	writeErr(w, http.StatusGatewayTimeout, "ADMIN_AUTH_NO_URL", "no authorization URL within 30s; see the broker log for discovery or registration errors")
+}
+
+func (a *Admin) authStatus(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("connector")
+	ready := false
+	if ad, ok := a.Registry.Lookup(name); ok {
+		ready = isReady(ad)
+	}
+	status := "unknown"
+	if a.OAuth != nil {
+		status = a.OAuth.Status(name)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"connector": name, "status": status, "connected": ready})
+}
+
+func (a *Admin) signOut(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("connector")
+	if a.OAuth == nil {
+		writeErr(w, http.StatusBadRequest, "ADMIN_NOT_OAUTH", "oauth unavailable")
+		return
+	}
+	if err := a.OAuth.Forget(name); err != nil {
+		writeErr(w, http.StatusInternalServerError, "ADMIN_AUTH_FAILED", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"connector": name, "status": "signed_out"})
 }
 
 func (a *Admin) listGrants(w http.ResponseWriter, r *http.Request) {
@@ -315,4 +408,9 @@ func RestoreOverlays(ctx context.Context, db *sql.DB, cat *catalog.Catalog) (int
 		n++
 	}
 	return n, rows.Err()
+}
+
+func isReady(ad adapter.Adapter) bool {
+	r, ok := ad.(interface{ Ready() bool })
+	return ok && r.Ready()
 }

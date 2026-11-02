@@ -9,8 +9,12 @@ import (
 
 // FrontHandler is the loopback surface agents and owner clients reach. It has
 // no control-plane routes: /v1/* answers 404 here by construction.
-func FrontHandler(front *mcpfront.Front) http.Handler {
+func FrontHandler(front *mcpfront.Front, oauthCallback http.HandlerFunc) http.Handler {
 	mux := http.NewServeMux()
+	if oauthCallback != nil {
+		// The browser lands here after signing the broker in to a remote server; it carries only the code.
+		mux.HandleFunc("GET /oauth/callback", oauthCallback)
+	}
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "build": buildinfo.Current()})
 	})

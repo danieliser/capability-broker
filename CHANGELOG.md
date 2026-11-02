@@ -4,6 +4,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-02
+
+- Remote connectors: `url:` plus `headers:` serves any Streamable HTTP MCP server through the broker.
+- OAuth sign-in for remote connectors: `oauth: {}` and `brokerd auth <connector>` (discovery, dynamic client registration, PKCE, refresh). One sign-in serves every client and agent; tokens live in `~/.brokerd/oauth/` (0600). A connector without a token reports `needs sign-in` and stops retrying instead of opening a browser.
+- `brokerd client adopt <server>...` moves servers out of every client config into the broker (secrets to `secrets.json`, mcp-remote wrappers to native url connectors, 401 servers to oauth), leaving a restorable copy in each client; `brokerd client restore <server>...` puts them back.
+- Claude Desktop is a client (`brokerd client install claude-desktop`), reaching the broker through mcp-remote.
+- `owner_only: true` keeps a connector out of agent grants (`ADMIN_OWNER_ONLY`).
+- Remote calls use HTTP/1.1, a broker User-Agent, and an `Mcp-Protocol-Version` header on `initialize`; Cloudflare-fronted servers refused Go's defaults with 403.
+
 ## [0.5.0] - 2026-11-01
 
 - Agent evaluation in `docs/eval.md`: Haiku 5.5 and GPT-6 Luna at low effort, three client setups, six tasks. Setup and prefix do not matter; Codex agents need one sentence saying the tools are live.

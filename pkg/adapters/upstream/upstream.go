@@ -7,8 +7,13 @@
 package upstream
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -25,6 +30,7 @@ import (
 	"github.com/danieliser/capability-broker/pkg/catalog"
 	"github.com/danieliser/capability-broker/pkg/compact"
 	"github.com/danieliser/capability-broker/pkg/connectors"
+	"github.com/danieliser/capability-broker/pkg/remoteauth"
 )
 
 type Adapter struct {
@@ -39,6 +45,9 @@ type Adapter struct {
 	tools     []catalog.Tool
 	conn      *catalog.Connector
 	connected time.Time
+
+	// Auth signs remote connectors in with OAuth; nil leaves oauth connectors unable to start.
+	Auth *remoteauth.Manager
 
 	hostsMu   sync.RWMutex // never held across the child's startup
 	siteHosts map[string]string
@@ -102,11 +111,30 @@ func (a *Adapter) Close() error {
 	return nil
 }
 
-func (a *Adapter) ensure(ctx context.Context) (*mcp.ClientSession, *catalog.Connector, error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if a.session != nil {
-		return a.session, a.conn, nil
+// needsAuth is returned by Start for an OAuth connector with no token; the reloader stops retrying on it.
+type needsAuth struct{ name string }
+
+func (e *needsAuth) Error() string {
+	return e.name + " needs sign-in: run `brokerd auth " + e.name + "`"
+}
+func (e *needsAuth) Unwrap() error { return remoteauth.ErrNeedsAuth }
+
+// transport is a stdio child for command connectors, Streamable HTTP for url connectors.
+func (a *Adapter) transport() (mcp.Transport, error) {
+	if a.spec.URL != "" {
+		hc := &http.Client{Transport: headerTransport{headers: a.spec.Headers, base: remoteauth.HTTP1Transport()}}
+		t := &mcp.StreamableClientTransport{Endpoint: a.spec.URL, HTTPClient: hc, MaxRetries: 2}
+		if a.spec.OAuth != nil {
+			if a.Auth == nil {
+				return nil, errors.New("oauth is not available in this broker")
+			}
+			h, err := a.Auth.Handler(a.spec)
+			if err != nil {
+				return nil, err
+			}
+			t.OAuthHandler = h
+		}
+		return t, nil
 	}
 	cmd := exec.Command(a.spec.Command, a.spec.Args...)
 	// The child's environment is exactly what the connector declares, plus PATH and HOME so package
@@ -120,11 +148,64 @@ func (a *Adapter) ensure(ctx context.Context) (*mcp.ClientSession, *catalog.Conn
 		cmd.Dir = a.spec.Cwd
 	}
 	cmd.Stderr = os.Stderr
+	return &mcp.CommandTransport{Command: cmd, TerminateDuration: time.Second}, nil
+}
+
+type headerTransport struct {
+	headers map[string]string
+	base    http.RoundTripper
+}
+
+func (t headerTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	r = r.Clone(r.Context())
+	// Bot protection in front of some servers (Cloudflare) answers Go's default User-Agent with 403.
+	r.Header.Set("User-Agent", remoteauth.UserAgent)
+	for k, v := range t.headers {
+		r.Header.Set(k, v)
+	}
+	// initialize carries no Mcp-Protocol-Version header (the version is not agreed yet), and some servers
+	// (agents.stackoverflow.com) answer that with 403 instead of the 401 that starts sign-in. Send the
+	// version the request itself proposes.
+	if r.Method == http.MethodPost && r.Header.Get("Mcp-Protocol-Version") == "" && r.Body != nil {
+		body, err := io.ReadAll(r.Body)
+		_ = r.Body.Close()
+		if err != nil {
+			return nil, err
+		}
+		var msg struct {
+			Method string `json:"method"`
+			Params struct {
+				ProtocolVersion string `json:"protocolVersion"`
+			} `json:"params"`
+		}
+		if json.Unmarshal(body, &msg) == nil && msg.Method == "initialize" && msg.Params.ProtocolVersion != "" {
+			r.Header.Set("Mcp-Protocol-Version", msg.Params.ProtocolVersion)
+		}
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		r.GetBody = func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(body)), nil }
+		r.ContentLength = int64(len(body))
+	}
+	return t.base.RoundTrip(r)
+}
+
+func (a *Adapter) ensure(ctx context.Context) (*mcp.ClientSession, *catalog.Connector, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.session != nil {
+		return a.session, a.conn, nil
+	}
+	transport, err := a.transport()
+	if err != nil {
+		return nil, nil, adapter.Unavailable(a.spec.Name + " did not start: " + adapter.Truncate(err.Error(), 200))
+	}
 	client := mcp.NewClient(&mcp.Implementation{Name: "brokerd", Version: "1"}, a.relay.clientOptions())
 	cctx, cancel := context.WithTimeout(ctx, a.spec.StartupTimeout)
 	defer cancel()
-	session, err := client.Connect(cctx, &mcp.CommandTransport{Command: cmd, TerminateDuration: time.Second}, nil)
+	session, err := client.Connect(cctx, transport, nil)
 	if err != nil {
+		if errors.Is(err, remoteauth.ErrNeedsAuth) || strings.Contains(err.Error(), remoteauth.ErrNeedsAuth.Error()) {
+			return nil, nil, fmt.Errorf("%w", &needsAuth{name: a.spec.Name})
+		}
 		return nil, nil, adapter.Unavailable(a.spec.Name + " did not start: " + adapter.Truncate(err.Error(), 200))
 	}
 	tools, err := discover(cctx, session)

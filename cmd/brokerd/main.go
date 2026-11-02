@@ -32,12 +32,13 @@ import (
 	"github.com/danieliser/capability-broker/pkg/pins"
 	"github.com/danieliser/capability-broker/pkg/registry"
 	"github.com/danieliser/capability-broker/pkg/reload"
+	"github.com/danieliser/capability-broker/pkg/remoteauth"
 )
 
 func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
-		case "client", "grant", "queries", "receipts", "status", "reload":
+		case "auth", "client", "grant", "queries", "receipts", "status", "reload":
 			os.Exit(runSubcommand(os.Args[1], os.Args[2:]))
 		}
 	}
@@ -112,8 +113,10 @@ func run(cfg config.Config, stateless bool) error {
 	writer := audit.NewWriter(db)
 	reg := registry.New()
 	front := &mcpfront.Front{Store: store, Catalog: cat, Audit: writer, Registry: reg, Logger: logger, SessionTimeout: 30 * time.Minute, Stateless: stateless}
+	oauthMgr := &remoteauth.Manager{DataDir: cfg.DataDir, CallbackURL: "http://" + cfg.FrontAddr() + remoteauth.CallbackPath,
+		Log: func(msg string, kv ...any) { logger.Info(msg, kv...) }}
 	pinMgr := &pins.Manager{DataDir: cfg.DataDir, TTL: pinTTL, Log: func(msg string, kv ...any) { logger.Info(msg, kv...) }}
-	reloader := &reload.Reloader{Config: cfg, Catalog: cat, Registry: reg, Front: front, Base: ctx, Pins: pinMgr,
+	reloader := &reload.Reloader{Config: cfg, Catalog: cat, Registry: reg, Front: front, Base: ctx, Pins: pinMgr, Auth: oauthMgr,
 		OnConnectorsChanged: func(names []string) {
 			syncManagedClients(cfg, names, func(msg string, kv ...any) { logger.Info(msg, kv...) })
 		},
@@ -156,9 +159,9 @@ func run(cfg config.Config, stateless bool) error {
 		}
 	}()
 
-	frontSrv := &http.Server{Addr: cfg.FrontAddr(), Handler: api.FrontHandler(front), ReadHeaderTimeout: 10 * time.Second}
+	frontSrv := &http.Server{Addr: cfg.FrontAddr(), Handler: api.FrontHandler(front, oauthMgr.Callback), ReadHeaderTimeout: 10 * time.Second}
 	admin := &api.Admin{Token: adminToken, Store: store, Catalog: cat, Audit: writer, Front: front, Registry: reg, DB: db,
-		FrontURL: "http://" + cfg.FrontAddr(), Started: time.Now(),
+		FrontURL: "http://" + cfg.FrontAddr(), Started: time.Now(), OAuth: oauthMgr, Reconnect: reloader.Reconnect,
 		Reload: func(ctx context.Context) (map[string]any, error) {
 			res, err := reloader.Apply(ctx)
 			if err != nil {

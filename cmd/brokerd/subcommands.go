@@ -56,6 +56,8 @@ func runSubcommand(name string, args []string) int {
 		}
 		printJSON(out)
 		return 0
+	case "auth":
+		return runAuth(args)
 	case "client":
 		return runClient(ctx, args)
 	case "grant":
@@ -107,6 +109,10 @@ func runClient(ctx context.Context, args []string) int {
 		return 0
 	case "install":
 		return runClientInstall(ctx, args[1:])
+	case "adopt":
+		return runClientAdopt(ctx, args[1:])
+	case "restore":
+		return runClientRestore(ctx, args[1:])
 	}
 	return fail("unknown client subcommand %s", args[0])
 }
