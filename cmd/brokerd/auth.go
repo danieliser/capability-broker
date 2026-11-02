@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/url"
 	"os/exec"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -20,12 +22,56 @@ func runAuth(args []string) int {
 	if len(args) > 0 && args[0] != "" && args[0][0] != '-' {
 		name, args = args[0], args[1:]
 	}
-	if err := fs.Parse(args); err != nil || name == "" {
-		return fail("usage: brokerd auth <connector> [--force] [--no-browser] [--sign-out]")
+	if err := fs.Parse(args); err != nil {
+		return fail("usage: brokerd auth [<connector>|<prefix>] [--force] [--no-browser] [--sign-out]")
 	}
 	c, _, err := adminClient()
 	if err != nil {
 		return fail("%v", err)
+	}
+	// Resolve the name: exact connector, or every connector starting with it ("cloudflare" → cloudflare-api,
+	// cloudflare-operator). With no name, list what needs signing in.
+	var st struct {
+		Connectors map[string]string `json:"connectors"`
+	}
+	sctx, scancel := context.WithTimeout(context.Background(), 30*time.Second)
+	_ = c.Do(sctx, "GET", "/v1/status", nil, &st)
+	scancel()
+	if name == "" {
+		n := 0
+		for conn, state := range st.Connectors {
+			if strings.HasPrefix(state, "needs sign-in") {
+				fmt.Printf("%-24s needs sign-in\n", conn)
+				n++
+			}
+		}
+		if n == 0 {
+			fmt.Println("every oauth connector is signed in")
+		} else {
+			fmt.Println("run: brokerd auth <connector>")
+		}
+		return 0
+	}
+	if _, exact := st.Connectors[name]; !exact {
+		var matches []string
+		for conn := range st.Connectors {
+			if strings.HasPrefix(conn, name) {
+				matches = append(matches, conn)
+			}
+		}
+		sort.Strings(matches)
+		if len(matches) == 0 {
+			return fail("no connector named %s", name)
+		}
+		rc := 0
+		for _, m := range matches {
+			fmt.Printf("== %s\n", m)
+			sub := append([]string{m}, args...)
+			if r := runAuth(sub); r != 0 {
+				rc = r
+			}
+		}
+		return rc
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 11*time.Minute)
 	defer cancel()

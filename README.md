@@ -46,6 +46,13 @@ interactive sessions share ClickHouse, a WordPress fleet and a memory service. T
   sign-in. A daemon never opens a browser by itself: without a token the connector reports
   `needs sign-in: brokerd auth <name>` and stops retrying. Remote calls use HTTP/1.1 and send a broker
   User-Agent, because Cloudflare bot protection challenges Go's default HTTP/2 client.
+- **Shaping per connector.** `expose: broker` keeps a connector out of the client's preloaded tools: the broker
+  entry offers `search_tools`, `describe_tool` and `call_tool` instead (progressive disclosure; Haiku 5.5 and GPT-6
+  Luna at low effort found and used such a tool 3/3 each). `clients:` picks which owner clients get it;
+  `tools: {include, exclude}` globs filter tools for every caller; `strip:` drops parts of tool definitions or
+  results; `response:` reshapes results (`drop_keys`, `compact`, `max_chars`, or an external `command` filter).
+  Client-side permission rules keyed to a tool name do not see calls made through `call_tool`; use
+  `tools.exclude` for anything that must never run.
 - **Owner-only connectors.** `owner_only: true` serves a connector to owner client tokens only; minting an agent
   grant that names it fails with `ADMIN_OWNER_ONLY`.
 - **Hot reload.** `connectors.yaml`, `secrets.json` and `catalog.d/*.yaml` are polled every 2 seconds (also
