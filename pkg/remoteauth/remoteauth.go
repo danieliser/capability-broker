@@ -11,8 +11,8 @@ package remoteauth
 
 import (
 	"context"
-	"crypto/tls"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -45,6 +45,8 @@ func HTTP1Transport() *http.Transport {
 	t := http.DefaultTransport.(*http.Transport).Clone()
 	t.ForceAttemptHTTP2 = false
 	t.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
+	// The clone may already offer h2 in ALPN; a server that picks it would then get HTTP/1.1 bytes.
+	t.TLSClientConfig = &tls.Config{NextProtos: []string{"http/1.1"}}
 	return t
 }
 
