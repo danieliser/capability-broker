@@ -1,7 +1,7 @@
 # Policy for `wp-mcp-router` (tools discovered at runtime). wp_run_across (fan-out to many sites) reaches
 # owner clients; an agent needs the `run_across` operation explicitly.
 connector: wp-mcp-router
-version: 4
+version: 5
 adapter_version: "2.0"
 tool_transforms: [narrow_site_enum]   # the `site` enum shows only the grant's sites
 site_hosts_tool: wp_list_sites        # learned at connect time for URL policy
@@ -13,6 +13,9 @@ operations:
     risk: read
     requires_capability: operations:content.read
     constraints: [sites, calls_per_run]
+    argument_constraints:
+      - { kind: max_per_day, key: max_per_day }
+      - { kind: row_limit, path: arguments.per_page, key: max_rows }
     guards: [wordpress_read_only, compact_request]
     response: [site_result]
     compact: { fields: [id, status, type, title, link, modified, date, slug] }
@@ -24,6 +27,8 @@ operations:
     risk: reversible
     requires_capability: operations:content.draft
     constraints: [sites, post_types, max_drafts_per_run, calls_per_run]
+    argument_constraints:
+      - { kind: max_per_day, key: max_per_day }
     guards: [force_draft_status, compact_request]
     response: [site_result]
     compact: { fields: [id, status, type, title, link, modified, slug] }
@@ -31,26 +36,36 @@ operations:
     tool: wp_run_across
     risk: sensitive
     requires_capability: operations:run_across
-    constraints: [calls_per_run]
+    constraints: [sites_filter, calls_per_run]
+    argument_constraints:
+      - { kind: max_per_day, key: max_per_day }
   - id: wordpress.site.read
     tool: wp_list_sites
     risk: read
     requires_capability: operations:content.read
     constraints: [sites_filter, calls_per_run]
+    argument_constraints:
+      - { kind: max_per_day, key: max_per_day }
   - id: wordpress.abilities.search
     tool: wp_search_abilities
     risk: read
     requires_capability: operations:content.read
     constraints: [sites_filter, calls_per_run]
+    argument_constraints:
+      - { kind: max_per_day, key: max_per_day }
   - id: wordpress.abilities.describe
     tool: wp_get_ability
     risk: read
     requires_capability: operations:content.read
     constraints: [sites, calls_per_run]
+    argument_constraints:
+      - { kind: max_per_day, key: max_per_day }
   - id: wordpress.content.read_url
     tool: wp_get_content_by_url
     risk: read
     requires_capability: operations:content.read
     constraints: [sites_url, calls_per_run]
+    argument_constraints:
+      - { kind: max_per_day, key: max_per_day }
     response: [site_result]
     compact: { fields: [id, status, type, title, link, modified, date, slug, site] }

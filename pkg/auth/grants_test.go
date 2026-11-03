@@ -107,3 +107,21 @@ func TestCounters(t *testing.T) {
 		}
 	}
 }
+
+func TestConstraintInheritanceCannotWiden(t *testing.T) {
+	parent := Capabilities{"x": {Constraints: map[string]any{"post_types": []any{"post"}, "max_importance": 0.5}, OperationConstraints: map[string]map[string]any{"x.send": {"to": []any{"a", "b"}, "subject_prefix": "[Fleet] ", "max_amount": 10.0, "max_per_day": 2.0}}}}
+	child := Capabilities{"x": {OperationConstraints: map[string]map[string]any{"x.send": {"to": []any{"b", "c"}, "subject_prefix": "[Fleet] report ", "max_amount": 100.0}}}}
+	narrowed := child.Intersect(parent)["x"]
+	if narrowed.Constraints["max_importance"] != 0.5 {
+		t.Fatal("parent constraint omitted")
+	}
+	op := narrowed.OperationConstraints["x.send"]
+	list, ok := constraintStrings(op["to"])
+	if !ok || len(list) != 1 || list[0] != "b" || op["subject_prefix"] != "[Fleet] report " || op["max_amount"] != 10.0 || op["max_per_day"] != 2.0 {
+		t.Fatalf("widened: %+v", op)
+	}
+	child["x"] = ConnectorCapability{OperationConstraints: map[string]map[string]any{"x.send": {"subject_prefix": "other"}}}
+	if child.Intersect(parent)["x"].OperationConstraints["x.send"]["subject_prefix"] != nil {
+		t.Fatal("incompatible prefix did not fail closed")
+	}
+}

@@ -305,3 +305,18 @@ func (s *Store) List(ctx context.Context, liveOnly bool) ([]GrantSummary, error)
 	}
 	return out, rows.Err()
 }
+
+// ReserveDaily atomically admits an attempt within an agent/project/operation UTC-day budget.
+// It persists independently of grant lifetime; denial does not increment the counter.
+func (s *Store) ReserveDaily(ctx context.Context, scope, operation, day string, limit int64) (bool, error) {
+	if limit <= 0 {
+		return false, nil
+	}
+	var n int64
+	err := s.db.QueryRowContext(ctx, `INSERT INTO daily_counters (scope, operation, day, count) VALUES (?,?,?,1)
+ ON CONFLICT(scope, operation, day) DO UPDATE SET count = count + 1 WHERE count < ? RETURNING count`, scope, operation, day, limit).Scan(&n)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	return err == nil, err
+}

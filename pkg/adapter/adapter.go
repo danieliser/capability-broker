@@ -91,6 +91,12 @@ func AsUpstream(err error) (*UpstreamError, bool) {
 	return nil, false
 }
 
+// Preparer normalises arguments before the final declarative policy pass and intent receipt.
+// It must not perform the requested action. Ownership lookups may read upstream records.
+type Preparer interface {
+	Prepare(ctx context.Context, call Call) (Call, error)
+}
+
 // Adapter is implemented once per connector.
 type Adapter interface {
 	Connector() string

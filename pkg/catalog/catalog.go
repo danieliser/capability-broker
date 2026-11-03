@@ -47,17 +47,18 @@ type Tool struct {
 
 // Operation is the stable policy key a (tool, argument pattern) resolves to.
 type Operation struct {
-	ID                 string            `yaml:"id"`
-	Tool               string            `yaml:"tool"`
-	Match              map[string]string `yaml:"match,omitempty"` // argument name → regex; all must match
-	Risk               Risk              `yaml:"risk"`
-	RequiresCapability string            `yaml:"requires_capability,omitempty"` // "sql.select" or "operations:<name>"
-	Constraints        []string          `yaml:"constraints,omitempty"`         // policy check names (pkg/policy)
-	Guards             []string          `yaml:"guards,omitempty"`              // request hooks (pkg/adapters/upstream)
-	Response           []string          `yaml:"response,omitempty"`            // response hooks (pkg/adapters/upstream)
-	Approval           string            `yaml:"approval,omitempty"`            // "exact_action" for P2 operations
-	Compact            map[string]any    `yaml:"compact,omitempty"`             // fields: [...] | max_items | max_string
-	Description        string            `yaml:"description,omitempty"`
+	ID                  string               `yaml:"id"`
+	Tool                string               `yaml:"tool"`
+	Match               map[string]string    `yaml:"match,omitempty"` // argument name → regex; all must match
+	Risk                Risk                 `yaml:"risk"`
+	RequiresCapability  string               `yaml:"requires_capability,omitempty"` // "sql.select" or "operations:<name>"
+	Constraints         []string             `yaml:"constraints,omitempty"`         // policy check names (pkg/policy)
+	Guards              []string             `yaml:"guards,omitempty"`              // request hooks (pkg/adapters/upstream)
+	Response            []string             `yaml:"response,omitempty"`            // response hooks (pkg/adapters/upstream)
+	Approval            string               `yaml:"approval,omitempty"`            // "exact_action" for P2 operations
+	Compact             map[string]any       `yaml:"compact,omitempty"`             // fields: [...] | max_items | max_string
+	Description         string               `yaml:"description,omitempty"`
+	ArgumentConstraints []ArgumentConstraint `yaml:"argument_constraints,omitempty"`
 
 	compiled map[string]*regexp.Regexp
 }
@@ -174,6 +175,11 @@ func (c *Connector) compile() error {
 		if op.Risk == "" {
 			return fmt.Errorf("operation %s needs a risk", op.ID)
 		}
+		for _, rule := range op.ArgumentConstraints {
+			if err := rule.Validate(); err != nil {
+				return fmt.Errorf("operation %s: %w", op.ID, err)
+			}
+		}
 		op.compiled = map[string]*regexp.Regexp{}
 		for arg, pattern := range op.Match {
 			re, err := regexp.Compile(pattern)
@@ -203,7 +209,8 @@ func (c *Catalog) Ensure(name string, toolNames []string) *Connector {
 	for _, t := range toolNames {
 		conn.Operations = append(conn.Operations, &Operation{
 			ID: name + "." + t, Tool: t, Risk: RiskReversible, RequiresCapability: "operations:" + t,
-			Constraints: []string{"calls_per_run"},
+			Constraints:         []string{"calls_per_run"},
+			ArgumentConstraints: []ArgumentConstraint{{Kind: "max_per_day", Key: "max_per_day"}},
 		})
 	}
 	_ = conn.compile()

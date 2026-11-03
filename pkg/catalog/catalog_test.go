@@ -116,3 +116,40 @@ queries:
 		t.Fatal("param without placeholder accepted")
 	}
 }
+
+func TestDeclarativeConstraintCatalogValidation(t *testing.T) {
+	for _, rule := range []string{
+		"{kind: typo, path: to, key: to}",
+		"{kind: prefix, key: subject_prefix}",
+		"{kind: maximum, path: amount}",
+		"{kind: row_limit, path: arguments..limit, key: max_rows}",
+		"{kind: row_limit, path: limit, key: max_rows, default: 1.5}",
+		"{kind: max_per_day, key: max_per_day, path: x}",
+	} {
+		raw := "connector: x\noperations:\n  - id: x.send\n    tool: send\n    risk: reversible\n    argument_constraints: [" + rule + "]\n"
+		if _, err := parseConnector([]byte(raw), "test"); err == nil {
+			t.Fatalf("bad rule accepted: %s", rule)
+		}
+	}
+	cat, err := Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	for _, name := range cat.Connectors() {
+		conn, _ := cat.Connector(name)
+		for _, op := range conn.Operations {
+			count++
+			found := false
+			for _, rule := range op.ArgumentConstraints {
+				found = found || rule.Kind == "max_per_day"
+			}
+			if !found {
+				t.Errorf("operation missing daily constraint: %s", op.ID)
+			}
+		}
+	}
+	if count != 17 {
+		t.Fatalf("operation map needs updating: got %d", count)
+	}
+}
