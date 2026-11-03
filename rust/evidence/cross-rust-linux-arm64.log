@@ -1,0 +1,122 @@
+   Compiling pin-project-lite v0.2.17
+   Compiling futures-core v0.3.34
+   Compiling itoa v1.0.18
+   Compiling bytes v1.12.1
+   Compiling memchr v2.8.3
+   Compiling futures-sink v0.3.34
+   Compiling futures-task v0.3.34
+   Compiling libc v0.2.191
+   Compiling serde_core v1.0.229
+   Compiling slab v0.4.12
+   Compiling futures-io v0.3.34
+   Compiling serde v1.0.229
+   Compiling once_cell v1.21.4
+   Compiling futures-channel v0.3.34
+   Compiling cfg-if v1.0.5
+   Compiling log v0.4.35
+   Compiling zmij v1.0.23
+   Compiling tower-service v0.3.3
+   Compiling rand_core v0.10.1
+   Compiling serde_json v1.0.154
+   Compiling httparse v1.10.1
+   Compiling tracing-core v0.1.36
+   Compiling getrandom v0.4.3
+   Compiling num-traits v0.2.19
+   Compiling smallvec v1.16.4
+   Compiling futures-util v0.3.34
+   Compiling http v1.5.0
+   Compiling tracing v0.1.44
+   Compiling bitflags v2.13.2
+   Compiling hashbrown v0.17.1
+   Compiling equivalent v1.0.3
+   Compiling ref-cast v1.0.27
+   Compiling nix v0.31.3
+   Compiling http-body v1.1.0
+   Compiling atomic-waker v1.1.2
+   Compiling sync_wrapper v1.0.2
+   Compiling foldhash v0.2.0
+   Compiling http-body-util v0.1.5
+   Compiling ryu v1.0.23
+   Compiling errno v0.3.14
+   Compiling mio v1.2.4
+   Compiling signal-hook-registry v1.4.8
+   Compiling socket2 v0.6.5
+   Compiling httpdate v1.0.3
+   Compiling percent-encoding v2.3.2
+   Compiling tower-layer v0.3.3
+   Compiling form_urlencoded v1.2.2
+   Compiling hashbrown v0.16.1
+   Compiling thiserror v2.0.21
+   Compiling tokio v1.54.1
+   Compiling libsqlite3-sys v0.37.0
+   Compiling aho-corasick v1.1.5
+   Compiling chacha20 v0.10.2
+   Compiling mime v0.3.17
+   Compiling regex-syntax v0.8.11
+   Compiling indexmap v2.14.2
+   Compiling futures-executor v0.3.34
+   Compiling futures v0.3.34
+   Compiling dyn-clone v1.0.20
+   Compiling anyhow v1.0.104
+   Compiling rmcp v3.8.0
+   Compiling chrono v0.4.45
+   Compiling serde_urlencoded v0.7.1
+   Compiling sse-stream v0.2.6
+   Compiling hashlink v0.11.1
+warning: libsqlite3-sys@0.37.0: Compiler family detection failed due to error: ToolNotFound: failed to find tool "aarch64-linux-gnu-gcc": No such file or directory (os error 2)
+error: failed to run custom build command for `libsqlite3-sys v0.37.0`
+
+Caused by:
+  process didn't exit successfully: `/Users/danieliser/Toolkit/capability-broker/rust/target/release/build/libsqlite3-sys-7d1292451a96a102/build-script-build` (exit status: 1)
+  --- stdout
+  cargo:rerun-if-env-changed=LIBSQLITE3_SYS_USE_PKG_CONFIG
+  cargo:include=/Users/danieliser/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libsqlite3-sys-0.37.0/sqlite3
+  cargo:rerun-if-changed=sqlite3/sqlite3.c
+  cargo:rerun-if-changed=sqlite3/wasm32-wasi-vfs.c
+  cargo:rerun-if-env-changed=SQLITE_MAX_VARIABLE_NUMBER
+  cargo:rerun-if-env-changed=SQLITE_MAX_EXPR_DEPTH
+  cargo:rerun-if-env-changed=SQLITE_MAX_COLUMN
+  cargo:rerun-if-env-changed=LIBSQLITE3_FLAGS
+  cargo:rerun-if-env-changed=CC_FORCE_DISABLE
+  CC_FORCE_DISABLE = None
+  cargo:rerun-if-env-changed=CC_aarch64-unknown-linux-gnu
+  CC_aarch64-unknown-linux-gnu = None
+  cargo:rerun-if-env-changed=CC_aarch64_unknown_linux_gnu
+  CC_aarch64_unknown_linux_gnu = None
+  cargo:rerun-if-env-changed=TARGET_CC
+  TARGET_CC = None
+  cargo:rerun-if-env-changed=CC
+  CC = None
+  cargo:rerun-if-env-changed=CROSS_COMPILE
+  CROSS_COMPILE = None
+  cargo:rerun-if-env-changed=CC_ENABLE_DEBUG_OUTPUT
+  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool "aarch64-linux-gnu-gcc": No such file or directory (os error 2)
+  cargo:rerun-if-env-changed=CPATH
+  cargo:rerun-if-env-changed=C_INCLUDE_PATH
+  cargo:rerun-if-env-changed=CPLUS_INCLUDE_PATH
+  cargo:rerun-if-env-changed=OBJC_INCLUDE_PATH
+  cargo:rerun-if-env-changed=OBJCPLUS_INCLUDE_PATH
+  cargo:rerun-if-env-changed=COMPILER_PATH
+  cargo:rerun-if-env-changed=SOURCE_DATE_EPOCH
+  cargo:rerun-if-env-changed=GCC_EXEC_PREFIX
+  cargo:rerun-if-env-changed=DEVELOPER_DIR
+  cargo:rerun-if-env-changed=TOOLCHAINS
+  cargo:rerun-if-env-changed=SDKROOT
+  cargo:rerun-if-env-changed=CRATE_CC_NO_DEFAULTS
+  CRATE_CC_NO_DEFAULTS = None
+  cargo:rerun-if-env-changed=CFLAGS
+  CFLAGS = None
+  cargo:rerun-if-env-changed=TARGET_CFLAGS
+  TARGET_CFLAGS = None
+  cargo:rerun-if-env-changed=CFLAGS_aarch64_unknown_linux_gnu
+  CFLAGS_aarch64_unknown_linux_gnu = None
+  cargo:rerun-if-env-changed=CFLAGS_aarch64-unknown-linux-gnu
+  CFLAGS_aarch64-unknown-linux-gnu = None
+
+  --- stderr
+
+
+  error occurred in cc-rs: failed to find tool "aarch64-linux-gnu-gcc": No such file or directory (os error 2)
+
+
+warning: build failed, waiting for other jobs to finish...

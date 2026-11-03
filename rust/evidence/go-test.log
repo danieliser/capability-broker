@@ -1,0 +1,22 @@
+ok  	github.com/danieliser/capability-broker/cmd/brokerd	3.177s
+?   	github.com/danieliser/capability-broker/cmd/brokerd-probe	[no test files]
+?   	github.com/danieliser/capability-broker/cmd/mockmcp	[no test files]
+?   	github.com/danieliser/capability-broker/pkg/adapter	[no test files]
+ok  	github.com/danieliser/capability-broker/pkg/adapters/upstream	1.241s
+?   	github.com/danieliser/capability-broker/pkg/api	[no test files]
+ok  	github.com/danieliser/capability-broker/pkg/audit	1.464s
+ok  	github.com/danieliser/capability-broker/pkg/auth	2.570s
+?   	github.com/danieliser/capability-broker/pkg/buildinfo	[no test files]
+ok  	github.com/danieliser/capability-broker/pkg/catalog	0.678s
+?   	github.com/danieliser/capability-broker/pkg/compact	[no test files]
+?   	github.com/danieliser/capability-broker/pkg/config	[no test files]
+ok  	github.com/danieliser/capability-broker/pkg/connectors	1.682s
+?   	github.com/danieliser/capability-broker/pkg/durable	[no test files]
+ok  	github.com/danieliser/capability-broker/pkg/mcpfront	0.481s
+ok  	github.com/danieliser/capability-broker/pkg/pins	0.919s
+ok  	github.com/danieliser/capability-broker/pkg/policy	2.077s
+?   	github.com/danieliser/capability-broker/pkg/registry	[no test files]
+?   	github.com/danieliser/capability-broker/pkg/reload	[no test files]
+ok  	github.com/danieliser/capability-broker/pkg/remoteauth	2.283s
+?   	github.com/danieliser/capability-broker/rust/bench	[no test files]
+ok  	github.com/danieliser/capability-broker/test/e2e	4.156s

@@ -1,0 +1,8 @@
+{
+  "rust/src/main.rs": 294,
+  "pkg/mcpfront/front.go": 651,
+  "pkg/adapters/upstream/upstream.go": 661,
+  "pkg/connectors/connectors.go": 268,
+  "pkg/audit/audit.go": 214,
+  "pkg/durable/sqlite.go": 134
+}

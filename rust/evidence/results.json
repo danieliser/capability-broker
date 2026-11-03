@@ -1,0 +1,66 @@
+{
+  "go": {
+    "runs": [
+      {
+        "calls": 2000,
+        "mean_us": 777.0584585,
+        "median_us": 728.813
+      },
+      {
+        "calls": 2000,
+        "mean_us": 775.172979,
+        "median_us": 717.146
+      },
+      {
+        "calls": 2000,
+        "mean_us": 785.2197915,
+        "median_us": 731.8545
+      }
+    ],
+    "idle_rss_kib": 23168,
+    "rss_after_2000_kib": 32192,
+    "receipts": {
+      "intent": 6005,
+      "outcome": 6005
+    },
+    "binary_bytes": 13830466,
+    "fixture_dir": "rust/.bench/go-1793680808889286000",
+    "cold_start_ms": [
+      372.920542,
+      26.217833,
+      26.937
+    ]
+  },
+  "rust": {
+    "runs": [
+      {
+        "calls": 2000,
+        "mean_us": 400.549125,
+        "median_us": 363.709
+      },
+      {
+        "calls": 2000,
+        "mean_us": 402.3558125,
+        "median_us": 363.2915
+      },
+      {
+        "calls": 2000,
+        "mean_us": 400.265604,
+        "median_us": 364.8955
+      }
+    ],
+    "idle_rss_kib": 8480,
+    "rss_after_2000_kib": 9872,
+    "receipts": {
+      "intent": 6010,
+      "outcome": 6010
+    },
+    "binary_bytes": 9292112,
+    "fixture_dir": "rust/.bench/rust-1793680814605106000",
+    "cold_start_ms": [
+      353.958833,
+      26.327208,
+      27.136708
+    ]
+  }
+}

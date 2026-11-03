@@ -1,0 +1,1 @@
+PASS: auth, stateless HTTP, exact passthrough (SDK client smoke separately), aggregate clash routing, args/env/secret resolution, env isolation, skipped remote, two receipt phases, fail-closed intent, missing-secret startup
