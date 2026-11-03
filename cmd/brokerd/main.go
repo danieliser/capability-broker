@@ -39,7 +39,7 @@ import (
 func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
-		case "auth", "client", "grant", "queries", "receipts", "status", "reload":
+		case "auth", "secret", "client", "grant", "queries", "receipts", "status", "reload":
 			os.Exit(runSubcommand(os.Args[1], os.Args[2:]))
 		}
 	}

@@ -21,6 +21,11 @@ into the broker (`~/.brokerd/clients/adopted.json`). This is a floor: Claude Cod
 session, so several open chats multiply the "before" column again. Reproduce with
 `python3 bench/memory_bench.py --copies clickhouse=4 memory=5 wp-mcp-router=5`.
 
+With `on_demand: true` on the four least-used servers (Metabase, DataForSEO, two Gmail accounts), the broker
+starts only the other four at boot: about 314 MB of servers instead of 570 MB. A call to a stopped server starts it
+(0.3 s for a pinned Node server) and `idle_stop` stops it again. The broker itself is 55–60 MB after GC tuning
+(`GOMEMLIMIT` 48 MiB, `GOGC` 50), down from 70–75 MB; its live heap is about 24 MB, mostly upstream tool schemas.
+
 ## Latency added per tool call
 
 | Path | Per call |
@@ -43,7 +48,8 @@ Tool definitions brokerd serves for the connectors above:
 | Every connector on demand (`expose: broker`) | 3 (`search_tools`, `describe_tool`, `call_tool`) | 1.6 KB (≈ 400 tokens) |
 
 That is what an MCP client without its own tool search pays, since it loads every schema up front (agents built
-directly on an SDK usually do). Claude Code
+directly on an SDK usually do), and what a fleet saves when each agent should see only its own few tools: a grant
+lists exactly those, with no MCP config per agent. Claude Code
 and Codex already defer MCP schemas behind their own tool search, so the measured cost of a trivial prompt is much
 smaller there:
 

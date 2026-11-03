@@ -255,7 +255,7 @@ func (a *Adapter) ensure(ctx context.Context) (*mcp.ClientSession, *catalog.Conn
 		a.instructions.Store(&in)
 	}
 	a.setExtras(listExtras(cctx, session))
-	go a.saveCache() // takes mu itself; ensure holds it until it returns
+	go a.saveCache()                        // takes mu itself; ensure holds it until it returns
 	a.lastUsed.Store(time.Now().UnixNano()) // idle_stop counts from the connect when nothing has called yet
 	a.ready.Store(true)
 	a.log("connector connected", "connector", a.spec.Name, "tools", len(tools), "catalog", conn.Source)
