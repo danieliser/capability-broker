@@ -177,3 +177,27 @@ func TestInventoryRejectsMalformedAndPartialPages(t *testing.T) {
 		t.Fatal("truncated record accepted")
 	}
 }
+
+func TestReviewCleanupRequiresByteExactScope(t *testing.T) {
+	for _, tags := range [][]any{
+		{strings.ToUpper(Tag), Namespace},
+		{"broker-ſmoke-test", Namespace},
+		{Tag, strings.ToUpper(Namespace)},
+		{Tag, "agent:companykit.data-ſync-steward"},
+	} {
+		f := &fake{records: []map[string]any{smoke("one", Namespace)}}
+		m, err := Inventory(context.Background(), f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.records[0]["tags"] = tags
+		if err := Apply(context.Background(), f, m, true); err == nil {
+			t.Errorf("nonexact scope deleted: %v", tags)
+		}
+		for _, call := range f.calls {
+			if call.Name == "delete_memory" {
+				t.Fatalf("scope mismatch reached delete: %v", tags)
+			}
+		}
+	}
+}

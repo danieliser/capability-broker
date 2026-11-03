@@ -121,7 +121,7 @@ func record(obj map[string]any) (Record, error) {
 }
 func has(tags []string, want string) bool {
 	for _, tag := range tags {
-		if strings.EqualFold(tag, want) {
+		if tag == want {
 			return true
 		}
 	}
@@ -134,7 +134,7 @@ func Inventory(ctx context.Context, c Caller) (Manifest, error) {
 	m := Manifest{Version: 1, ObservedAt: time.Now().UTC().Format(time.RFC3339), Tag: Tag, Namespace: Namespace, Memories: []Record{}}
 	seen := map[string]bool{}
 	for offset := 0; ; offset += 200 {
-		obj, err := read(ctx, c, map[string]any{"tags": []string{Tag}, "exhaustive": true, "limit": 200, "offset": offset, "format": "json"})
+		obj, err := read(ctx, c, map[string]any{"tags": []string{Tag}, "tag_match": "exact", "exhaustive": true, "limit": 200, "offset": offset, "format": "json"})
 		if err != nil {
 			return Manifest{}, err
 		}
