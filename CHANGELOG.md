@@ -4,6 +4,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-03
+
+- `on_demand: true` keeps a server stopped until a call needs it; its tools, prompts, resources and instructions are listed from the last discovery (`~/.brokerd/cache/`). `idle_stop` (default 10m for on-demand servers) stops a started server after a quiet period; the next call starts it again.
+- Memory: a soft heap limit (48 MiB) and `GOGC=50` unless the environment sets its own; cached per-client servers idle for 30 minutes are dropped. Broker RSS 70–75 MB → 55–60 MB.
+- `brokerd secret set|list|rm <NAME>`: keys into secrets.json from stdin, never argv or logs.
+- Heap and CPU profiles on the admin socket (`/debug/pprof/heap`, `/debug/pprof/profile`).
+- `skills/mcp-install`: install MCP servers through the broker, set up a machine, give fleet agents their own tools.
+- Fix: a deadlock when an on-demand server saved its discovery cache during its first connect.
+
 ## [0.9.0] - 2026-11-03
 
 - Owner clients get each upstream's prompts, resources and resource templates, as if connected directly (`strip: [prompts]` / `[resources]` hides them).

@@ -14,9 +14,13 @@ headless get the same keys you do.
   one-command restore.
 - **Sign in once.** Remote servers with OAuth (`brokerd auth vercel`) are signed in by the broker, refreshed by the
   broker, and shared by every app.
+- **Fleets without per-agent MCP setup.** Each agent gets exactly the tools its config names, from the same
+  servers, with no MCP config per agent to maintain.
 - **Agents get grants, not keys.** A headless agent gets a token scoped to the servers, queries, sites and operations
   in its config, minted per run and revoked when it ends, with a receipt for every call. Owner-only servers
   (your Gmail) can never be granted.
+- **Less memory.** `on_demand: true` keeps a rarely used server stopped until a call needs it (its tools are listed
+  from cache) and stops it again after `idle_stop`.
 - **Less context.** `expose: broker` keeps a server out of the preloaded tool list; the model finds and runs its tools
   through `search_tools` / `call_tool` when needed. Low-effort Haiku and GPT-6 Luna both used them 3/3.
 - **Shape what comes through.** Per server: which apps get it, tool include/exclude globs, strip schema parts,
@@ -75,6 +79,7 @@ connectors:
     command: uv
     args: [--directory, ~/mcp/metabase, run, server.py]
     expose: broker                     # not preloaded; found through search_tools / call_tool
+    on_demand: true                    # not started until called; stops after idle_stop (default 10m)
     clients: [claude-code, codex]      # or [!cursor]
     tools: { exclude: ["delete_*"] }   # hidden and refused for every caller
     response: { drop_keys: [debug], max_chars: 20000 }
@@ -109,6 +114,7 @@ brokerd auth [<connector>|<prefix>]           # OAuth sign-in; bare `brokerd aut
 brokerd client install <app>|all [--mode servers|single] [--revert]
 brokerd client adopt <server>[=<connector>]... [--owner-only] [--dry-run]
 brokerd client restore <server>...
+brokerd secret set|list|rm <NAME>              # keys into secrets.json; the value comes from stdin, never argv
 brokerd reload                                # apply connectors.yaml / secrets.json now instead of within 2s
 brokerd queries push --project <key> --file queries.yaml   # named ClickHouse queries agents may run
 brokerd grant mint|list|revoke                # agent grants (a control plane normally does this)
@@ -137,7 +143,7 @@ pkg/reload  pkg/pins    hot reload; pinned npx/uvx installs
 pkg/audit  pkg/durable  receipts, SQLite
 test/e2e                the broker against cmd/mockmcp
 bench/                  memory and context benchmarks
-skills/                 an agent skill for operating brokerd
+skills/                 agent skills: mcp-install (add servers, set up a machine), brokerd-operations
 ```
 
 ## Development

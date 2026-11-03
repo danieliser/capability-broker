@@ -112,6 +112,7 @@ func (r *Reloader) Apply(ctx context.Context) (Result, error) {
 		}
 		ad := upstream.New(spec, r.Catalog, r.Log)
 		ad.Auth = r.Auth
+		ad.CacheDir = filepath.Join(r.Config.DataDir, "cache")
 		ad.OnChange = func() {
 			base := r.Base
 			if base == nil {
@@ -133,6 +134,13 @@ func (r *Reloader) Apply(ctx context.Context) (Result, error) {
 		base := r.Base
 		if base == nil {
 			base = context.Background()
+		}
+		if spec.IdleStop > 0 {
+			go ad.WatchIdle(base)
+		}
+		if spec.OnDemandStart && ad.LoadCache() {
+			// Listed from the last discovery; the first call starts it.
+			continue
 		}
 		go r.startWithRetry(base, name, ad)
 	}
@@ -265,8 +273,10 @@ func digest(s *connectors.Spec) string {
 		Expose            string
 		Tools             *connectors.ToolFilter
 		Response          *connectors.ResponseFilter
+		OnDemand          bool
+		IdleStop          time.Duration
 	}{s.Command, s.Cwd, s.URL, s.Args, s.Env, s.Headers, s.OAuth, s.StartupTimeout, s.CallTimeout, s.OwnerOnly,
-		s.Clients, s.Strip, s.Expose, s.Tools, s.Response})
+		s.Clients, s.Strip, s.Expose, s.Tools, s.Response, s.OnDemandStart, s.IdleStop})
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
 }
