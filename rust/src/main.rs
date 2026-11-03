@@ -105,19 +105,25 @@ impl Front {
                 if !c.spec.allows(&t.name) {
                     continue;
                 }
-                let duplicates = selected
-                    .iter()
-                    .filter(|(_, other)| !self.hidden(other))
-                    .filter(|(_, other)| {
-                        other
-                            .discovery
-                            .read()
-                            .unwrap()
-                            .tools
-                            .iter()
-                            .any(|other| other.name == t.name)
-                    })
-                    .count();
+                let duplicates = if self.connector.is_none()
+                    && self.options.get("prefix").is_some_and(|p| p == "none")
+                {
+                    selected
+                        .iter()
+                        .filter(|(_, other)| !self.hidden(other))
+                        .filter(|(_, other)| {
+                            other
+                                .discovery
+                                .read()
+                                .unwrap()
+                                .tools
+                                .iter()
+                                .any(|other| other.name == t.name)
+                        })
+                        .count()
+                } else {
+                    0
+                };
                 let exported = if self.connector.is_none()
                     && (self.options.get("prefix").is_none_or(|p| p != "none") || duplicates > 1)
                 {
@@ -331,11 +337,15 @@ impl ServerHandler for Front {
                 let _ = c.discover(live.client.as_ref().unwrap()).await;
             }
             live.last_used = Instant::now();
-            let mut value = serde_json::to_value(result?).map_err(internal)?;
-            if let Some(f) = &c.spec.response {
-                if f.tools.is_empty() || connectors::matches(&f.tools, &route.upstream_name) {
-                    value = shaping::filter(value, f).await.map_err(internal)?;
-                }
+            let result = result?;
+            if c.spec.response.is_none() && !c.spec.strips("structured") {
+                return Ok(result);
+            }
+            let mut value = serde_json::to_value(result).map_err(internal)?;
+            if let Some(f) = &c.spec.response
+                && (f.tools.is_empty() || connectors::matches(&f.tools, &route.upstream_name))
+            {
+                value = shaping::filter(value, f).await.map_err(internal)?;
             }
             if c.spec.strips("structured") {
                 value.as_object_mut().unwrap().remove("structuredContent");
@@ -478,21 +488,21 @@ async fn main() -> Result<()> {
                 let idle =
                     connectors::duration(&c.spec.idle_stop, if c.spec.on_demand { 600 } else { 0 })
                         .unwrap();
-                if c.changed.load(std::sync::atomic::Ordering::Acquire) {
-                    if let Ok(live) = c.live.try_lock() {
-                        if let Some(client) = live.client.as_ref() {
-                            if c.discover(client).await.is_ok() {
-                                c.changed.store(false, std::sync::atomic::Ordering::Release);
-                            }
-                        }
-                    }
+                if c.changed.load(std::sync::atomic::Ordering::Acquire)
+                    && let Ok(live) = c.live.try_lock()
+                    && let Some(client) = live.client.as_ref()
+                    && c.discover(client).await.is_ok()
+                {
+                    c.changed.store(false, std::sync::atomic::Ordering::Release);
                 }
-                if !idle.is_zero() {
-                    if let Ok(mut live) = c.live.try_lock() {
-                        if live.last_used.elapsed() >= idle {
-                            live.client.take();
-                        }
+                if !idle.is_zero()
+                    && let Ok(mut live) = c.live.try_lock()
+                    && live.last_used.elapsed() >= idle
+                {
+                    if let Some(task) = live.listener.take() {
+                        task.abort();
                     }
+                    live.client.take();
                 }
             }
         }

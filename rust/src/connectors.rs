@@ -108,6 +108,12 @@ pub fn load(root: &Path) -> Result<BTreeMap<String, Spec>> {
         #[serde(default)]
         connectors: BTreeMap<String, Option<Spec>>,
     }
+    use std::os::unix::fs::PermissionsExt;
+    if let Ok(meta) = std::fs::metadata(root.join("secrets.json"))
+        && meta.permissions().mode() & 0o077 != 0
+    {
+        bail!("secrets.json must have mode 0600");
+    }
     let secrets: BTreeMap<String, String> = match std::fs::read(root.join("secrets.json")) {
         Ok(b) => serde_json::from_slice(&b)?,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => BTreeMap::new(),
@@ -199,8 +205,16 @@ impl ClientHandler for Changes {
     }
 }
 pub struct Live {
+    pub listener: Option<tokio::task::JoinHandle<()>>,
     pub client: Option<RunningService<RoleClient, Changes>>,
     pub last_used: Instant,
+}
+impl Drop for Live {
+    fn drop(&mut self) {
+        if let Some(task) = self.listener.take() {
+            task.abort();
+        }
+    }
 }
 pub struct Connector {
     pub spec: Spec,
@@ -225,6 +239,7 @@ impl Connector {
             discovery: RwLock::new(discovery),
             live: Mutex::new(Live {
                 client: None,
+                listener: None,
                 last_used: Instant::now(),
             }),
             cache,
@@ -282,6 +297,24 @@ impl Connector {
         let client =
             tokio::time::timeout(duration(&self.spec.startup_timeout, 90)?, connect).await??;
         self.discover(&client).await?;
+        if client
+            .peer_info()
+            .is_some_and(|i| i.protocol_version == ProtocolVersion::LATEST)
+        {
+            let filter = SubscriptionFilter::builder()
+                .tools_list_changed()
+                .prompts_list_changed()
+                .resources_list_changed()
+                .build();
+            let mut subscription =
+                tokio::time::timeout(Duration::from_secs(5), client.listen(filter)).await??;
+            let changed = self.changed.clone();
+            live.listener = Some(tokio::spawn(async move {
+                while let Ok(Some(_)) = subscription.next().await {
+                    changed.store(true, std::sync::atomic::Ordering::Release);
+                }
+            }));
+        }
         live.client = Some(client);
         Ok(())
     }
@@ -310,6 +343,10 @@ impl Connector {
         }
         if self.spec.on_demand || !self.spec.idle_stop.is_empty() {
             std::fs::create_dir_all(self.cache.parent().unwrap())?;
+            std::fs::set_permissions(
+                self.cache.parent().unwrap(),
+                std::os::unix::fs::PermissionsExt::from_mode(0o700),
+            )?;
             use std::io::Write;
             use std::os::unix::fs::OpenOptionsExt;
             let tmp = self.cache.with_extension("json.tmp");
@@ -337,13 +374,57 @@ pub async fn reload(root: &Path, registry: &Registry) -> Result<()> {
             continue;
         }
         let c = Arc::new(Connector::new(root, &name, spec));
-        if !c.spec.on_demand || c.discovery.read().unwrap().tools.is_empty() {
-            if let Err(e) = c.ensure(&mut *c.live.lock().await).await {
-                eprintln!("connector {name} failed: {e}");
-            }
+        if (!c.spec.on_demand || c.discovery.read().unwrap().tools.is_empty())
+            && let Err(e) = c.ensure(&mut *c.live.lock().await).await
+        {
+            eprintln!("connector {name} failed: {e}");
         }
         next.insert(name, c);
     }
     *registry.write().unwrap() = next;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn durations_and_filters() {
+        assert_eq!(duration("1m30s", 0).unwrap(), Duration::from_secs(90));
+        assert_eq!(duration("250ms", 0).unwrap(), Duration::from_millis(250));
+        assert!(duration("1mBAD", 0).is_err());
+        assert!(duration("-1s", 0).is_err());
+        let s = Spec {
+            tools: ToolFilter {
+                include: vec!["read*".into()],
+                exclude: vec!["read_secret".into()],
+            },
+            ..Default::default()
+        };
+        assert!(s.allows("read_all"));
+        assert!(!s.allows("read_secret"));
+        assert!(!s.allows("write"));
+    }
+    #[test]
+    fn invalid_reload_is_atomic() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(".bench")
+            .join(format!("unit-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("connectors.yaml"),"connectors:\n  good: {command: echo}\n  bad: {command: echo, url: 'https://example.invalid'}\n").unwrap();
+        assert!(load(&root).is_err());
+        std::fs::write(
+            root.join("connectors.yaml"),
+            "connectors:\n  good: {command: echo, env: {KEY: '${secret:MISSING}'}}\n",
+        )
+        .unwrap();
+        assert!(load(&root).is_err());
+        std::fs::write(
+            root.join("connectors.yaml"),
+            "connectors:\n  good: {url: 'http://localhost.evil.invalid/mcp'}\n",
+        )
+        .unwrap();
+        assert!(load(&root).is_err());
+        std::fs::remove_dir_all(root).unwrap();
+    }
 }

@@ -66,10 +66,10 @@ pub async fn filter(mut v: Value, f: &Filter) -> Result<Value> {
     if !f.drop_keys.is_empty() || f.compact {
         if let Some(content) = v["content"].as_array_mut() {
             for c in content {
-                if let Some(text) = c["text"].as_str() {
-                    if let Ok(data) = serde_json::from_str(text) {
-                        c["text"] = json!(serde_json::to_string(&reshape(data, f, 0))?);
-                    }
+                if let Some(text) = c["text"].as_str()
+                    && let Ok(data) = serde_json::from_str(text)
+                {
+                    c["text"] = json!(serde_json::to_string(&reshape(data, f, 0))?);
                 }
             }
         }
@@ -98,18 +98,18 @@ pub async fn filter(mut v: Value, f: &Filter) -> Result<Value> {
         let text = String::from_utf8(output.stdout)?.trim().to_string();
         v=serde_json::from_str::<Value>(&text).ok().filter(|v|v["content"].is_array()).unwrap_or_else(||json!({"content":[{"type":"text","text":text}],"isError":v["isError"].as_bool().unwrap_or(false)}));
     }
-    if f.max_chars > 0 {
-        if let Some(a) = v["content"].as_array_mut() {
-            for c in a {
-                if let Some(s) = c["text"].as_str() {
-                    let n = s.chars().count();
-                    if n > f.max_chars {
-                        c["text"] = json!(format!(
-                            "{}\n…[{} more characters cut by the broker]",
-                            s.chars().take(f.max_chars).collect::<String>(),
-                            n - f.max_chars
-                        ));
-                    }
+    if f.max_chars > 0
+        && let Some(a) = v["content"].as_array_mut()
+    {
+        for c in a {
+            if let Some(s) = c["text"].as_str() {
+                let n = s.chars().count();
+                if n > f.max_chars {
+                    c["text"] = json!(format!(
+                        "{}\n…[{} more characters cut by the broker]",
+                        s.chars().take(f.max_chars).collect::<String>(),
+                        n - f.max_chars
+                    ));
                 }
             }
         }

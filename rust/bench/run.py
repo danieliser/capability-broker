@@ -59,7 +59,7 @@ def main():
                         smoke=run([OUT/'client','smoke',f'http://127.0.0.1:{port}/mcp/mock',token,OUT/'mockmcp'])
                         (OUT/f'{kind}-smoke.json').write_text(smoke.stdout)
                         if kind=='rust':
-                            aggregate=run([OUT/'client','smoke',f'http://127.0.0.1:{port}/mcp',token,OUT/'mockmcp'])
+                            aggregate=run([OUT/'client','smoke',f'http://127.0.0.1:{port}/mcp?prefix=none',token,OUT/'mockmcp'])
                             (OUT/'rust-aggregate-smoke.json').write_text(aggregate.stdout)
                         db=sqlite3.connect(root/'broker.db')
                         receipts=dict(db.execute('select phase,count(*) from receipts group by phase'))
