@@ -1,3 +1,4 @@
 /target/
 /.bench/
 !/evidence/*.log
+/bench/__pycache__/

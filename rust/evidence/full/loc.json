@@ -1,0 +1,14 @@
+{
+  "rust_src_including_unit_tests": {
+    "physical_lines": 1134,
+    "files": 3
+  },
+  "go_daemon_production": {
+    "physical_lines": 8478,
+    "files": 35
+  },
+  "go_tests": {
+    "physical_lines": 1878,
+    "files": 13
+  }
+}

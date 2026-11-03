@@ -1,0 +1,16 @@
+{
+  "go": {
+    "tools": 300,
+    "connectors": 50,
+    "ready_ms": 139.14754102006555,
+    "rss_kib": 30848,
+    "fixture": "/Users/danieliser/Toolkit/capability-broker/rust/.bench/shape-go-1793693027182712000"
+  },
+  "rust": {
+    "tools": 300,
+    "connectors": 50,
+    "ready_ms": 474.9357079854235,
+    "rss_kib": 19728,
+    "fixture": "/Users/danieliser/Toolkit/capability-broker/rust/.bench/shape-rust-1793693027355877000"
+  }
+}

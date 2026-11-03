@@ -1,0 +1,66 @@
+{
+  "go": {
+    "runs": [
+      {
+        "calls": 2000,
+        "mean_us": 1101.1082705,
+        "median_us": 1050.7295
+      },
+      {
+        "calls": 2000,
+        "mean_us": 1215.28825,
+        "median_us": 1172.4165
+      },
+      {
+        "calls": 2000,
+        "mean_us": 1863.640292,
+        "median_us": 1583.375
+      }
+    ],
+    "idle_rss_kib": 23728,
+    "rss_after_2000_kib": 32288,
+    "receipts": {
+      "intent": 6005,
+      "outcome": 6005
+    },
+    "binary_bytes": 14287474,
+    "fixture_dir": "/Users/danieliser/Toolkit/capability-broker/rust/.bench/go-1793693013968683000",
+    "cold_start_ms": [
+      570.207125,
+      25.991208,
+      26.467666
+    ]
+  },
+  "rust": {
+    "runs": [
+      {
+        "calls": 2000,
+        "mean_us": 542.9854165,
+        "median_us": 398.583
+      },
+      {
+        "calls": 2000,
+        "mean_us": 417.3675,
+        "median_us": 372.833
+      },
+      {
+        "calls": 2000,
+        "mean_us": 483.7795835,
+        "median_us": 366.208
+      }
+    ],
+    "idle_rss_kib": 14656,
+    "rss_after_2000_kib": 15872,
+    "receipts": {
+      "intent": 6010,
+      "outcome": 6010
+    },
+    "binary_bytes": 15816224,
+    "fixture_dir": "/Users/danieliser/Toolkit/capability-broker/rust/.bench/rust-1793693023768053000",
+    "cold_start_ms": [
+      44.243458,
+      26.98975,
+      24.78925
+    ]
+  }
+}

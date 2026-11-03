@@ -1,0 +1,8 @@
+{
+  "http1": true,
+  "broker_user_agent": true,
+  "protocol_header_initialize": true,
+  "secret_header": true,
+  "remote_echo": true,
+  "fixture": "/Users/danieliser/Toolkit/capability-broker/rust/.bench/remote-1793692997964282000"
+}

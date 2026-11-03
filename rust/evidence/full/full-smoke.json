@@ -1,0 +1,12 @@
+{
+  "owner_front": true,
+  "prompt_resource_template_passthrough": true,
+  "runtime_discovery": true,
+  "idle_process_exit_and_restart": true,
+  "invalid_reload_preserves_state": true,
+  "poll_and_sighup": true,
+  "discovery_tools": true,
+  "filter_and_strip": true,
+  "failed_intent_denies_upstream": true,
+  "fixture": "/Users/danieliser/Toolkit/capability-broker/rust/.bench/full-smoke-1793692993153903000"
+}
