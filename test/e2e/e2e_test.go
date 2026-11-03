@@ -48,7 +48,7 @@ type env struct {
 	front *mcpfront.Front
 }
 
-func newEnv(t *testing.T, specs ...*connectors.Spec) *env {
+func newEnv(t testing.TB, specs ...*connectors.Spec) *env {
 	t.Helper()
 	db, err := durable.Open(context.Background(), filepath.Join(t.TempDir(), "b.db"))
 	if err != nil {
@@ -82,7 +82,7 @@ func newEnv(t *testing.T, specs ...*connectors.Spec) *env {
 	return &env{srv: srv, store: f.Store, front: f}
 }
 
-func (e *env) owner(t *testing.T, client string) string {
+func (e *env) owner(t testing.TB, client string) string {
 	_, tok, err := e.store.Mint(context.Background(), auth.MintRequest{Kind: auth.KindClient, Name: client, Capabilities: auth.OwnerCapabilities(), IssuedBy: "t"})
 	if err != nil {
 		t.Fatal(err)
@@ -98,7 +98,7 @@ func (b bearer) RoundTrip(r *http.Request) (*http.Response, error) {
 	return http.DefaultTransport.RoundTrip(r)
 }
 
-func (e *env) connect(t *testing.T, token, path string, opts *mcp.ClientOptions) *mcp.ClientSession {
+func (e *env) connect(t testing.TB, token, path string, opts *mcp.ClientOptions) *mcp.ClientSession {
 	t.Helper()
 	c := mcp.NewClient(&mcp.Implementation{Name: "e2e", Version: "0"}, opts)
 	s, err := c.Connect(context.Background(), &mcp.StreamableClientTransport{Endpoint: e.srv.URL + path, MaxRetries: -1,
