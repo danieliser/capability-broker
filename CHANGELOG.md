@@ -4,6 +4,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-11-03
+
+- Outcome and denial receipts are written in batches off the call path (the intent row stays synchronous, so a failed intent write still denies the call); SQLite runs WAL with `synchronous=NORMAL`. Per call through the broker: 0.70 ms → 0.60 ms in `test/e2e` benchmarks.
+- Tool schemas are shared with the SDK's decoded copy instead of stored twice.
+- The MCP SDK's per-request session connect/disconnect info lines are no longer logged (warnings and errors still are).
+
 ## [0.10.0] - 2026-11-03
 
 - `on_demand: true` keeps a server stopped until a call needs it; its tools, prompts, resources and instructions are listed from the last discovery (`~/.brokerd/cache/`). `idle_stop` (default 10m for on-demand servers) stops a started server after a quiet period; the next call starts it again.
