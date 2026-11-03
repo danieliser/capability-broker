@@ -62,15 +62,17 @@ const AggregateEndpoint = "*"
 // liveServer is one grant's view of one endpoint. Its tools are refreshed in place on reload so connected
 // sessions (legacy or 2026-07-28 subscriptions/listen) receive tools/list_changed instead of going stale.
 type liveServer struct {
-	mu        sync.Mutex
-	server    *mcp.Server
-	grant     *auth.Grant
-	endpoint  string          // connector name, or AggregateEndpoint
-	exclude   map[string]bool // aggregate only: connectors the client already has as their own servers
-	plain     bool            // aggregate only: upstream tool names unprefixed, except where two connectors clash
-	hint      bool            // prepend a one-line "live connection" note to each tool description (clients that drop server instructions)
-	toolHash  map[string]string
-	toolOwner map[string]string // exported name → connector
+	mu          sync.Mutex
+	server      *mcp.Server
+	grant       *auth.Grant
+	endpoint    string          // connector name, or AggregateEndpoint
+	exclude     map[string]bool // aggregate only: connectors the client already has as their own servers
+	plain       bool            // aggregate only: upstream tool names unprefixed, except where two connectors clash
+	hint        bool            // prepend a one-line "live connection" note to each tool description (clients that drop server instructions)
+	toolHash    map[string]string
+	toolOwner   map[string]string // exported name → connector
+	allOnDemand bool              // aggregate only (?ondemand=all): every connector reached through discovery
+	extHash     map[string]string // "p:"+prompt name | "r:"+uri | "t:"+uri template → definition hash
 }
 
 type errorBody struct {
@@ -158,7 +160,7 @@ func (f *Front) handler(endpoint string) http.Handler {
 			}
 		}
 		q := r.URL.Query()
-		return f.serverFor(r.Context(), endpoint, g, exclude, q.Get("prefix") == "none", q.Get("instructions") == "none", q.Get("hint") == "live")
+		return f.serverFor(r.Context(), endpoint, g, exclude, q.Get("prefix") == "none", q.Get("instructions") == "none", q.Get("hint") == "live", q.Get("ondemand") == "all")
 	}, &mcp.StreamableHTTPOptions{SessionTimeout: f.SessionTimeout, Logger: f.Logger, Stateless: f.Stateless})
 	f.handlers[endpoint] = h
 	return h
@@ -185,16 +187,16 @@ func (f *Front) authenticate(r *http.Request) (*auth.Grant, string, string) {
 }
 
 // serverFor returns the stable server for (endpoint, grant, exclude), creating and populating it once.
-func (f *Front) serverFor(ctx context.Context, endpoint string, g *auth.Grant, exclude []string, plain, noInstructions, hint bool) *mcp.Server {
+func (f *Front) serverFor(ctx context.Context, endpoint string, g *auth.Grant, exclude []string, plain, noInstructions, hint, allOnDemand bool) *mcp.Server {
 	sort.Strings(exclude)
 	instructions := ""
 	if !noInstructions {
-		instructions = f.instructions(endpoint, g, exclude)
+		instructions = f.instructions(endpoint, g, exclude, allOnDemand)
 	}
 	// Instructions are fixed per MCP server, and upstreams supply theirs only once connected: a change (a
 	// connector finished starting, or was added) gets a fresh server for new sessions instead of stale text.
 	sum := sha256.Sum256([]byte(instructions))
-	key := endpoint + "|" + g.ID + "|" + strings.Join(exclude, ",") + fmt.Sprintf("|plain=%v|noinst=%v|hint=%v|ins=%x", plain, noInstructions, hint, sum[:6])
+	key := endpoint + "|" + g.ID + "|" + strings.Join(exclude, ",") + fmt.Sprintf("|plain=%v|noinst=%v|hint=%v|od=%v|ins=%x", plain, noInstructions, hint, allOnDemand, sum[:6])
 	f.mu.Lock()
 	if f.servers == nil {
 		f.servers = map[string]*liveServer{}
@@ -209,9 +211,9 @@ func (f *Front) serverFor(ctx context.Context, endpoint string, g *auth.Grant, e
 			Instructions: instructions,
 			// Declared up front: a server that starts with no tools (an aggregate whose connectors are all
 			// excluded, or still starting) must still tell the client it has tools and will announce changes.
-			Capabilities: &mcp.ServerCapabilities{Tools: &mcp.ToolCapabilities{ListChanged: true}}}),
-			grant: g, endpoint: endpoint, exclude: map[string]bool{}, plain: plain && endpoint == AggregateEndpoint, hint: hint,
-			toolHash: map[string]string{}, toolOwner: map[string]string{}}
+			Capabilities: serverCaps(g.Capabilities.IsOwner())}),
+			grant: g, endpoint: endpoint, exclude: map[string]bool{}, plain: plain && endpoint == AggregateEndpoint, hint: hint, allOnDemand: allOnDemand && endpoint == AggregateEndpoint,
+			toolHash: map[string]string{}, toolOwner: map[string]string{}, extHash: map[string]string{}}
 		for _, e := range exclude {
 			ls.exclude[e] = true
 		}
@@ -227,7 +229,7 @@ func (f *Front) serverFor(ctx context.Context, endpoint string, g *auth.Grant, e
 // instructions is the server's MCP `instructions`, which clients put in the model's context. Low-effort models
 // otherwise answer "I have no access" without looking at their tools (measured: GPT-6 Luna low skipped tools in
 // most failed runs). It names the live systems behind this server and says to use them.
-func (f *Front) instructions(endpoint string, g *auth.Grant, exclude []string) string {
+func (f *Front) instructions(endpoint string, g *auth.Grant, exclude []string, allOnDemand bool) string {
 	skip := map[string]bool{}
 	for _, e := range exclude {
 		skip[e] = true
@@ -243,7 +245,7 @@ func (f *Front) instructions(endpoint string, g *auth.Grant, exclude []string) s
 		names = []string{endpoint}
 	}
 	if g.Capabilities.IsOwner() {
-		return f.ownerInstructions(g, endpoint == AggregateEndpoint, names)
+		return f.ownerInstructions(g, endpoint == AggregateEndpoint, names, allOnDemand)
 	}
 	if len(names) == 0 {
 		return "Live connectors added to this server later appear as new tools; check your tool list when a task needs a system you do not see."
@@ -267,7 +269,7 @@ func (f *Front) instructions(endpoint string, g *auth.Grant, exclude []string) s
 
 // ownerInstructions passes each upstream server's own instructions through, as the client would have shown
 // them with the server connected directly. Nothing of the broker's own is added.
-func (f *Front) ownerInstructions(g *auth.Grant, aggregate bool, names []string) string {
+func (f *Front) ownerInstructions(g *auth.Grant, aggregate bool, names []string, allOnDemand bool) string {
 	var parts []string
 	var onDemand []string
 	var direct []string
@@ -276,7 +278,7 @@ func (f *Front) ownerInstructions(g *auth.Grant, aggregate bool, names []string)
 		if sp != nil && !sp.ForClient(g.Name) {
 			continue
 		}
-		if sp != nil && sp.OnDemand() && aggregate {
+		if aggregate && ((sp != nil && sp.OnDemand()) || allOnDemand) {
 			onDemand = append(onDemand, n)
 			continue
 		}
@@ -354,7 +356,7 @@ func (f *Front) refreshOne(ctx context.Context, ls *liveServer, initial bool) {
 				if !sp.ForClient(ls.grant.Name) {
 					continue
 				}
-				if sp.OnDemand() {
+				if sp.OnDemand() || ls.allOnDemand {
 					// Kept inside the broker: reached through the discovery tools, not preloaded.
 					onDemand = append(onDemand, name)
 					continue
@@ -432,6 +434,9 @@ func (f *Front) refreshOne(ctx context.Context, ls *liveServer, initial bool) {
 		}
 	}
 	f.syncDiscovery(ls, onDemand, desired)
+	if owner {
+		f.syncExtras(ctx, ls, connectors, keep)
+	}
 	for exported, d := range desired {
 		if owner && d.tool.Upstream != nil {
 			// Owner clients see the upstream tool exactly as declared (title, annotations, output schema,

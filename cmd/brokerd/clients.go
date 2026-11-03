@@ -83,7 +83,7 @@ func runClientInstall(ctx context.Context, args []string) int {
 	fs := flag.NewFlagSet("client install", flag.ContinueOnError)
 	only := fs.String("connectors", "", "connectors to route as their own servers (default: every connector the broker runs)")
 	revert := fs.Bool("revert", false, "restore the entries the broker replaced and remove its own")
-	mode := fs.String("mode", "single", "single: one broker entry carrying every connector; servers: one entry per connector plus broker for later ones")
+	mode := fs.String("mode", "servers", "servers: one entry per connector under its original name, plus broker for later and on-demand ones; single: one broker entry carrying every connector")
 	prefix := fs.String("prefix", "none", "single mode tool names: none (upstream names, prefixed only on a clash) or connector (<connector>__<tool>)")
 	target := ""
 	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {

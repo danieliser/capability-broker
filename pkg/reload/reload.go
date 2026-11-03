@@ -112,6 +112,13 @@ func (r *Reloader) Apply(ctx context.Context) (Result, error) {
 		}
 		ad := upstream.New(spec, r.Catalog, r.Log)
 		ad.Auth = r.Auth
+		ad.OnChange = func() {
+			base := r.Base
+			if base == nil {
+				base = context.Background()
+			}
+			r.Front.Refresh(base)
+		}
 		prev := r.Registry.Set(name, ad)
 		r.digests[name] = d
 		if prev != nil {
