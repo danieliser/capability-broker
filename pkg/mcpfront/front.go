@@ -71,6 +71,7 @@ type liveServer struct {
 	hint      bool            // prepend a one-line "live connection" note to each tool description (clients that drop server instructions)
 	toolHash  map[string]string
 	toolOwner map[string]string // exported name → connector
+	extHash   map[string]string // "p:"+prompt name | "r:"+uri | "t:"+uri template → definition hash
 }
 
 type errorBody struct {
@@ -209,9 +210,9 @@ func (f *Front) serverFor(ctx context.Context, endpoint string, g *auth.Grant, e
 			Instructions: instructions,
 			// Declared up front: a server that starts with no tools (an aggregate whose connectors are all
 			// excluded, or still starting) must still tell the client it has tools and will announce changes.
-			Capabilities: &mcp.ServerCapabilities{Tools: &mcp.ToolCapabilities{ListChanged: true}}}),
+			Capabilities: serverCaps(g.Capabilities.IsOwner())}),
 			grant: g, endpoint: endpoint, exclude: map[string]bool{}, plain: plain && endpoint == AggregateEndpoint, hint: hint,
-			toolHash: map[string]string{}, toolOwner: map[string]string{}}
+			toolHash: map[string]string{}, toolOwner: map[string]string{}, extHash: map[string]string{}}
 		for _, e := range exclude {
 			ls.exclude[e] = true
 		}
@@ -432,6 +433,9 @@ func (f *Front) refreshOne(ctx context.Context, ls *liveServer, initial bool) {
 		}
 	}
 	f.syncDiscovery(ls, onDemand, desired)
+	if owner {
+		f.syncExtras(ctx, ls, connectors, keep)
+	}
 	for exported, d := range desired {
 		if owner && d.tool.Upstream != nil {
 			// Owner clients see the upstream tool exactly as declared (title, annotations, output schema,

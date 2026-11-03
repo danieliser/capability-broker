@@ -50,6 +50,11 @@ type Adapter struct {
 
 	// Auth signs remote connectors in with OAuth; nil leaves oauth connectors unable to start.
 	Auth *remoteauth.Manager
+	// OnChange is called when the upstream announces a changed tool, prompt or resource list.
+	OnChange func()
+
+	extrasMu sync.RWMutex // never held across the child's startup
+	extras   extras
 
 	hostsMu   sync.RWMutex // never held across the child's startup
 	siteHosts map[string]string
@@ -208,7 +213,12 @@ func (a *Adapter) ensure(ctx context.Context) (*mcp.ClientSession, *catalog.Conn
 	if err != nil {
 		return nil, nil, adapter.Unavailable(a.spec.Name + " did not start: " + adapter.Truncate(err.Error(), 200))
 	}
-	client := mcp.NewClient(&mcp.Implementation{Name: "brokerd", Version: "1"}, a.relay.clientOptions())
+	opts := a.relay.clientOptions()
+	// An upstream that changes its tools, prompts or resources at runtime says so; re-read and tell the front.
+	opts.ToolListChangedHandler = func(context.Context, *mcp.ToolListChangedRequest) { go a.rediscover() }
+	opts.PromptListChangedHandler = func(context.Context, *mcp.PromptListChangedRequest) { go a.rediscover() }
+	opts.ResourceListChangedHandler = func(context.Context, *mcp.ResourceListChangedRequest) { go a.rediscover() }
+	client := mcp.NewClient(&mcp.Implementation{Name: "brokerd", Version: "1"}, opts)
 	cctx, cancel := context.WithTimeout(ctx, a.spec.StartupTimeout)
 	defer cancel()
 	session, err := client.Connect(cctx, transport, nil)
@@ -232,28 +242,8 @@ func (a *Adapter) ensure(ctx context.Context) (*mcp.ClientSession, *catalog.Conn
 	if ir := session.InitializeResult(); ir != nil {
 		in := ir.Instructions
 		a.instructions.Store(&in)
-		if c := ir.Capabilities; c != nil && (c.Prompts != nil || c.Resources != nil || c.Completions != nil) {
-			// Not proxied yet: only tools reach clients through the broker.
-			np, nr, nt := -1, -1, -1
-			if c.Prompts != nil {
-				if r, err := session.ListPrompts(cctx, nil); err == nil {
-					np = len(r.Prompts)
-				}
-			}
-			if c.Resources != nil {
-				if r, err := session.ListResources(cctx, nil); err == nil {
-					nr = len(r.Resources)
-				}
-				if r, err := session.ListResourceTemplates(cctx, nil); err == nil {
-					nt = len(r.ResourceTemplates)
-				}
-			}
-			if np > 0 || nr > 0 || nt > 0 {
-				a.log("connector offers features the broker does not pass through", "connector", a.spec.Name,
-					"prompts", np, "resources", nr, "resource_templates", nt)
-			}
-		}
 	}
+	a.setExtras(listExtras(cctx, session))
 	a.ready.Store(true)
 	a.log("connector connected", "connector", a.spec.Name, "tools", len(tools), "catalog", conn.Source)
 	if conn.SiteHostsTool != "" {
