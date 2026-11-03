@@ -101,8 +101,8 @@ func TestOwnerProfile(t *testing.T) {
 	f := setup(t)
 	o := f.owner(t)
 	d := f.eval(t, o, "clickhouse", "run_query", map[string]any{"query": "SELECT 1"})
-	if !d.Allow || d.Limits["max_rows"].(float64) != DefaultMaxRows*10 {
-		t.Fatalf("owner sql denied or wrong limit: %+v", d)
+	if !d.Allow || len(d.Limits) != 0 {
+		t.Fatalf("owner sql denied or agent limits applied: %+v", d)
 	}
 	d = f.eval(t, o, "clickhouse", "run_query", map[string]any{"query": "@other.q"})
 	if !d.Allow {

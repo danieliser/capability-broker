@@ -136,7 +136,8 @@ func TestClickHouseNamedQueryRewrittenForTheChild(t *testing.T) {
 	if len(tools) != 3 {
 		t.Fatalf("owner tools %d", len(tools))
 	}
-	if _, err := run(t, a, cat, owner, "run_query", map[string]any{"query": "SELECT 1; DROP TABLE x"}, false); err == nil {
+	sqlAgent := agent(auth.Capabilities{"clickhouse": {SQL: "select"}})
+	if _, err := run(t, a, cat, sqlAgent, "run_query", map[string]any{"query": "SELECT 1; DROP TABLE x"}, false); err == nil {
 		t.Fatal("multi-statement accepted")
 	}
 }

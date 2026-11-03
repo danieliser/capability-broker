@@ -625,11 +625,15 @@ func (f *Front) call(ctx context.Context, connector, tool string, req *mcp.CallT
 	conn, _ := f.Catalog.Connector(connector)
 	base := audit.Call{Grant: g, Connector: connector, Tool: tool, Args: args, PolicyVersion: f.Catalog.PolicyVersion(),
 		IdempotencyKey: idem, Verbose: verbose, RequestBytes: requestBytes}
-	if conn == nil || !conn.ToolExposed(tool) {
+	if conn == nil || conn.ToolDenied(tool) || (!g.Capabilities.IsOwner() && !conn.ToolExposed(tool)) {
 		f.Audit.Denied(ctx, base, policy.CodeDeniedOperation, "tool not exposed")
 		return toolError(policy.CodeDeniedOperation, fmt.Sprintf("tool %s is not available through this connector", tool)), nil
 	}
 	op, ok := conn.Resolve(tool, args)
+	if !ok && g.Capabilities.IsOwner() {
+		// The exposed upstream tool may accept actions outside the agent catalog.
+		op, ok = &catalog.Operation{ID: connector + "." + tool, Tool: tool, Risk: catalog.RiskSensitive}, true
+	}
 	if !ok {
 		f.Audit.Denied(ctx, base, policy.CodeDeniedOperation, "no operation matches these arguments")
 		return toolError(policy.CodeDeniedOperation, "this call does not map to a permitted operation (check the ability or query name)"), nil

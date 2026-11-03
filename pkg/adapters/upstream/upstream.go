@@ -370,7 +370,7 @@ func (a *Adapter) Tools(ctx context.Context, g *auth.Grant) ([]catalog.Tool, err
 	owner := g.Capabilities.IsOwner()
 	out := make([]catalog.Tool, 0, len(tools))
 	for _, t := range tools {
-		if !conn.ToolExposed(t.Name) || !a.spec.Tools.Allows(t.Name) {
+		if conn.ToolDenied(t.Name) || (!owner && !conn.ToolExposed(t.Name)) || !a.spec.Tools.Allows(t.Name) {
 			continue
 		}
 		if !owner && !reachable(conn.OperationsFor(t.Name), cap) {
@@ -490,6 +490,9 @@ func (a *Adapter) Prepare(ctx context.Context, call adapter.Call) (adapter.Call,
 	s, _, err := a.ensure(ctx)
 	if err != nil {
 		return call, err
+	}
+	if call.Grant != nil && call.Grant.Capabilities.IsOwner() {
+		return call, nil
 	}
 	args := policy.CloneArgs(call.Decision.Args)
 	for _, hook := range call.Op.Guards {

@@ -315,13 +315,21 @@ func (conn *Connector) Resolve(tool string, args map[string]any) (*Operation, bo
 // ToolExposed reports whether the connector passes this upstream tool through at
 // all: not denied, and reachable by at least one operation.
 func (conn *Connector) ToolExposed(name string) bool {
-	for _, d := range conn.ToolsDeny {
-		if d == name {
-			return false
-		}
+	if conn.ToolDenied(name) {
+		return false
 	}
 	for _, op := range conn.Operations {
 		if op.Tool == name {
+			return true
+		}
+	}
+	return false
+}
+
+// ToolDenied applies explicit connector exclusions to every caller, including owners.
+func (conn *Connector) ToolDenied(name string) bool {
+	for _, denied := range conn.ToolsDeny {
+		if denied == name {
 			return true
 		}
 	}

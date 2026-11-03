@@ -64,6 +64,10 @@ func Evaluate(ctx context.Context, g *auth.Grant, connector string, op *catalog.
 	owner := g.Capabilities.IsOwner()
 	args := CloneArgs(in)
 	d := Decision{Allow: true, Args: args, Limits: map[string]any{}}
+	// Owner calls use connector exposure controls, never agent argument policy.
+	if owner {
+		return d, nil
+	}
 
 	if op.RequiresCapability != "" && !owner {
 		switch {
