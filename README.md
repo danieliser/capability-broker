@@ -1,167 +1,143 @@
-# capability-broker (`brokerd`)
+# brokerd — one MCP hub for every AI app and agent on your machine
 
-One always-on Go daemon that holds the credentials your AI agents must never see, and exposes each upstream
-service to them as an ordinary MCP server, with the upstream tool names and schemas unchanged. Policy,
-per-agent grants, approvals and receipts sit behind that URL, invisible to the agent.
+Every AI app you use (Claude Code, Codex, Cursor, OpenCode, Claude Desktop) starts its own copy of each MCP server,
+keeps its own copy of each API key, and makes you sign in to each remote server separately. Agents you run
+headless get the same keys you do.
 
-```
-agent / Claude Code / Codex  ──HTTP MCP──▶  brokerd :8890/mcp/<connector>  ──credential injected here──▶  upstream
-                                              │ grant → operation → policy → receipt
-                              PERSIST ──unix socket admin──▶ grants, catalog, receipts
-```
+**brokerd runs each MCP server once and hands it to every app and agent**, without them noticing the difference:
 
-Built for a single-owner Mac where several headless agents (PERSIST named agents) and the owner's own
-interactive sessions share ClickHouse, a WordPress fleet and a memory service. The design and evidence live in
-`docs/`.
+- **Invisible to your apps.** Each app keeps one entry per server under the name it already knew. Tools, results,
+  errors, instructions, prompts and resources pass through exactly as the server sends them, so your permission
+  rules and approval settings keep working.
+- **One place for servers and secrets.** `~/.brokerd/connectors.yaml` and `secrets.json`, hot-reloaded. Add a server
+  once; every app sees it, mid-chat. `brokerd client adopt` moves the servers your apps already have, with a
+  one-command restore.
+- **Sign in once.** Remote servers with OAuth (`brokerd auth vercel`) are signed in by the broker, refreshed by the
+  broker, and shared by every app.
+- **Agents get grants, not keys.** A headless agent gets a token scoped to the servers, queries, sites and operations
+  in its config, minted per run and revoked when it ends, with a receipt for every call. Owner-only servers
+  (your Gmail) can never be granted.
+- **Less context.** `expose: broker` keeps a server out of the preloaded tool list; the model finds and runs its tools
+  through `search_tools` / `call_tool` when needed. Low-effort Haiku and GPT-6 Luna both used them 3/3.
+- **Shape what comes through.** Per server: which apps get it, tool include/exclude globs, strip schema parts,
+  trim or filter responses (including through your own command, e.g. `jq`).
 
-## What it does
+![Memory with every app open: 2.4 GB → 0.65 GB](docs/img/memory.svg)
 
-- **Transparent MCP.** `GET|POST /mcp/clickhouse`, `/mcp/wp-mcp-router`, `/mcp/memory` are Streamable HTTP MCP
-  endpoints. Sessionless Streamable HTTP (MCP 2026-07-28) by default, verified with Claude Code 2.1.316, Codex 0.166
-  and the Go SDK client; `--stateless=false` keeps `Mcp-Session-Id` sessions for older clients. `tools/list` returns
-  the upstream tool definitions filtered to what the caller's grant allows, plus one additive `verbose` flag.
-- **Invisible to its owner.** Owner client tokens see each upstream exactly as if connected directly: tool
-  definitions (annotations, output schemas, titles), results (all content blocks, `structuredContent`, `isError`)
-  and the upstream's own instructions pass through untouched. Policy, compaction and the `verbose` flag apply to
-  agent grants only. Prompts and resources are not passed through yet (logged when an upstream has any).
-- **Grants, not credentials.** A caller holds a random bearer (`cbg_…` for agents, `cbc_…` for owner clients)
-  bound to a capability set: named queries, sites, operations, namespaces, limits. Hashes at rest, revocation
-  checked on every call, child grants can only narrow. Agent grants are minted by the control plane (PERSIST)
-  over the admin socket and die with the session.
-- **Operations as the policy key.** A tool call resolves to a stable operation id by tool name plus argument
-  pattern (`run_query` with `@group.name` → `clickhouse.named_query`; `wp_run core/delete-post` → no operation,
-  denied). The policy engine runs after argument enrichment, so an adapter cannot widen a call.
-- **Tool-agnostic hosting.** Every connector is a stdio MCP server declared in `~/.brokerd/connectors.yaml`
-  (command, args, env with `${secret:…}` references). The broker starts it once, discovers its tools and exports
-  them verbatim; the child's environment is exactly what the connector declares plus `PATH` and `HOME`. Policy
-  comes from the connector's catalog: `~/.brokerd/catalog.d/<name>.yaml` if you wrote one, else the catalog
-  embedded for that name (`clickhouse`, `wp-mcp-router`, `memory`), else a synthesized one in which every tool is
-  an operation of its own name that an agent grant must list. Catalogs refer to small named hooks (resolve a
-  named query, force `status: draft`, force namespace tags, filter a recall by namespace, narrow a `site` enum)
-  rather than carrying code.
-- **Remote servers and sign-in.** A connector may be a remote Streamable HTTP server (`url:`, optional
-  `headers:` with `${secret:…}`) instead of a command. `oauth: {}` signs the broker in with OAuth 2.1 (protected
-  resource discovery, dynamic client registration, PKCE) once, with `brokerd auth <connector>`; the token and
-  refresh token live in `~/.brokerd/oauth/<connector>.json` (0600) and every client and agent uses that one
-  sign-in. A daemon never opens a browser by itself: without a token the connector reports
-  `needs sign-in: brokerd auth <name>` and stops retrying. Remote calls use HTTP/1.1 and send a broker
-  User-Agent, because Cloudflare bot protection challenges Go's default HTTP/2 client.
-- **Shaping per connector.** `expose: broker` keeps a connector out of the client's preloaded tools: the broker
-  entry offers `search_tools`, `describe_tool` and `call_tool` instead (progressive disclosure; Haiku 5.5 and GPT-6
-  Luna at low effort found and used such a tool 3/3 each). `clients:` picks which owner clients get it;
-  `tools: {include, exclude}` globs filter tools for every caller; `strip:` drops parts of tool definitions or
-  results; `response:` reshapes results (`drop_keys`, `compact`, `max_chars`, or an external `command` filter).
-  Client-side permission rules keyed to a tool name do not see calls made through `call_tool`; use
-  `tools.exclude` for anything that must never run.
-- **Owner-only connectors.** `owner_only: true` serves a connector to owner client tokens only; minting an agent
-  grant that names it fails with `ADMIN_OWNER_ONLY`.
-- **Hot reload.** `connectors.yaml`, `secrets.json` and `catalog.d/*.yaml` are polled every 2 seconds (also
-  `SIGHUP`, `brokerd reload`). Added connectors start, changed ones restart, removed ones stop; a file that fails to
-  parse changes nothing. Every connected MCP session gets `tools/list_changed`, so an open chat sees the change.
-- **Aggregate endpoint.** `/mcp` carries every connector the grant reaches as `<connector>__<tool>`;
-  `?exclude=a,b` leaves out connectors a client already has as their own servers. That is the entry that makes a
-  newly added connector usable mid-chat. Verified with Claude Code 2.1.316 in both transport modes.
-- **Pinned runners.** A connector run through `npx` or `uvx` is resolved to one version, installed under
-  `~/.brokerd/runtimes/<connector>/`, and run from there, so a start never waits on the registry. The original
-  command runs until the install exists. Pins are rechecked after `--pin-ttl` (24h); a newer version installs beside
-  the old one (one previous kept) and swaps in by hot reload. `pin: false` on a connector opts out.
-- **Relay.** Progress notifications from the child reach the calling client by token; sampling and elicitation
-  requests are forwarded while exactly one call is in flight on that child (session mode only; the sessionless
-  transport rejects server-initiated requests by design).
-- **Receipts.** An append-only SQLite table with an `intent` row before every upstream call and an `outcome` row
-  after, including denials. A failed intent write denies the call.
-- **Compact by default.** Every response is trimmed rtk-style (long strings cut, arrays capped, deep trees pruned,
-  hypermedia keys dropped, JSON-in-string documents opened) unless the operation declares explicit fields;
-  `verbose: true` returns the upstream payload untouched.
+| Measured | |
+|---|---|
+| Memory, 8 local servers, every app open | 2,424 MB → 645 MB |
+| Latency added per tool call | ≈ 0.6 ms |
+| Tool definitions loaded per chat, 304 tools | 1.05 MB → 1.6 KB on demand |
 
-## Install (macOS)
+Methods and caveats in [docs/benchmarks.md](docs/benchmarks.md). macOS today (launchd); the daemon is plain Go.
+
+## Install
 
 ```sh
 git clone https://github.com/danieliser/capability-broker ~/Toolkit/capability-broker
 cd ~/Toolkit/capability-broker
 ./install.sh            # builds with a stamped identity, installs ~/.local/bin/brokerd, loads launchd
-brokerd status          # admin socket + token under ~/.brokerd
+brokerd status
 ```
 
-Secrets go in `~/.brokerd/secrets.json` (mode 0600), a flat object the connectors reference as `${secret:key}`:
+Keys live in `~/.brokerd/secrets.json` (0600) and are referenced as `${secret:NAME}`; the installer seeds
+`~/.brokerd/connectors.yaml` from `connectors.example.yaml`. Settings: `BROKERD_PORT`, `BROKERD_HOST` (loopback
+only), `BROKERD_DATA_DIR`.
 
-```json
-{ "clickhouse_password": "…", "automem_api_key": "…" }
-```
-
-The installer seeds `~/.brokerd/connectors.yaml` from `connectors.example.yaml`; edit commands and env for your
-upstreams. Daemon settings are `BROKERD_PORT`, `BROKERD_HOST` (loopback only) and `BROKERD_DATA_DIR`.
-
-## Use
+## Move your existing servers in
 
 ```sh
-# a project's named ClickHouse queries (versioned with the repo)
-brokerd queries push --project companykit --file .persist/broker/queries.yaml
-
-# an agent grant (PERSIST does this per wake; the CLI is for tests)
-brokerd grant mint --agent my.agent --session s1 --project companykit --capabilities caps.json --ttl 1h
-brokerd grant list
-brokerd grant revoke <grant-id>
-
-# your own sessions: Claude Code, Codex, Cursor and OpenCode, each with its own owner token
-brokerd client install all                # or claude-code | claude-desktop | codex | cursor | opencode
-#   Claude Desktop takes stdio servers only, so its `broker` entry runs mcp-remote with the token in env
-#   --mode single (default): one `broker` server carrying every connector; tools pass through
-#   --mode servers: one server entry per connector plus `broker` for connectors added later
-#   --prefix none (default): upstream tool names, prefixed only where two connectors clash; connector: <connector>__<tool>
-# Measured (docs/eval.md): Haiku 5.5 and GPT-6 Luna at low effort do equally well with per-connector servers, one
-# prefixed broker or one plain broker. Codex drops MCP server instructions, so Codex agents need one sentence of
-# standing instructions saying the tools are live (Luna 14/18 without it, 18/18 with it).
-brokerd client install all --revert       # restore the original entries
-# Installed clients are managed: when a connector is added or removed, the daemon updates each client's config.
-# An open chat reaches a new connector through `broker` (mcp__broker__<connector>__<tool>); the next chat sees it
-# as its own server with the upstream's tool names.
-
-# move servers your clients already run into the broker (Claude Code, Claude Desktop, Cursor, OpenCode, Codex).
-# Secrets in env/headers move to secrets.json; mcp-remote wrappers become native url connectors; a url that
-# answers 401 becomes an oauth connector. Each client keeps a restorable copy (mcpServersBackup in JSON configs,
-# enabled = false in Codex and OpenCode) and the broker keeps the originals in clients/adopted.json.
-brokerd client adopt dataforseo metabase openaiDeveloperDocs=openai-docs
-brokerd client adopt gmail-work gmail-personal --owner-only
-brokerd client adopt cloudflare-api vercel --dry-run      # print the connector definitions only
-brokerd client restore dataforseo                         # put it back in every client, disable it in the broker
-
-# sign the broker in to an oauth connector (opens the browser once)
-brokerd auth vercel
-brokerd auth vercel --force       # sign in again
-brokerd auth vercel --sign-out
-
-# apply config changes now instead of within 2s
-brokerd reload
-
-# receipts
-brokerd receipts --limit 50
-
-# ad-hoc MCP calls from the shell
-brokerd-probe -url http://127.0.0.1:8890/mcp/clickhouse -token "$TOKEN" -tool run_query -args '{"query":"@scheduler.freshness"}'
+brokerd client adopt dataforseo metabase gmail-work --dry-run   # see the connector definitions first
+brokerd client adopt dataforseo metabase
+brokerd client adopt gmail-work --owner-only                    # never granted to agents
+brokerd client install all                                      # every app: one entry per server, original names
+brokerd auth vercel                                              # OAuth servers: sign the broker in once
+brokerd client restore metabase                                  # changed your mind: put it back everywhere
 ```
 
-A capabilities file:
+`adopt` reads the server from whichever app has it, moves its keys into `secrets.json`, turns `mcp-remote` wrappers
+into native remote connectors, and leaves a restorable copy in every app's config. It warns when an app has
+permission rules keyed to that server.
+
+## Configure a server
+
+```yaml
+connectors:
+  dataforseo:
+    command: npx                       # npx/uvx runners are pinned to one installed version
+    args: [-y, dataforseo-mcp-server]
+    env: { DATAFORSEO_PASSWORD: "${secret:DATAFORSEO_PASSWORD}" }
+  vercel:
+    url: https://mcp.vercel.com/
+    oauth: {}                          # discovery + dynamic registration; brokerd auth vercel
+  metabase:
+    command: uv
+    args: [--directory, ~/mcp/metabase, run, server.py]
+    expose: broker                     # not preloaded; found through search_tools / call_tool
+    clients: [claude-code, codex]      # or [!cursor]
+    tools: { exclude: ["delete_*"] }   # hidden and refused for every caller
+    response: { drop_keys: [debug], max_chars: 20000 }
+  gmail-work:
+    command: gog
+    args: [--account, work, --readonly, mcp]
+    owner_only: true
+```
+
+Every option, with the rest of the behaviour, is in [docs/reference.md](docs/reference.md).
+
+## Agents
+
+A control plane (PERSIST, here) mints a grant per agent run over the admin socket:
 
 ```json
 {
-  "clickhouse": { "queries": ["scheduler.freshness"], "limits": { "max_rows": 2000, "calls_per_run": 40 } },
-  "wp-mcp-router": { "sites": ["wppopupmaker"], "operations": ["content.read", "content.draft"],
-                     "constraints": { "post_types": ["post"] }, "limits": { "max_drafts_per_run": 3 } },
-  "memory": { "namespaces": ["agent:my.agent", "project:companykit"], "operations": ["recall", "store"] }
+  "clickhouse": { "queries": ["scheduler.freshness"], "limits": { "max_rows": 2000 } },
+  "wp-mcp-router": { "sites": ["wppopupmaker"], "operations": ["content.read", "content.draft"] },
+  "memory": { "namespaces": ["agent:my.agent"], "operations": ["recall", "store"] }
 }
 ```
+
+The agent sees one `broker` server with only those tools, arguments narrowed to what it may use, responses trimmed
+for its context, and a receipt row before and after every call. The grant dies with the session.
+
+## Commands
+
+```sh
+brokerd status                                # every connector: ok | needs sign-in | degraded (why)
+brokerd auth [<connector>|<prefix>]           # OAuth sign-in; bare `brokerd auth` lists what is waiting
+brokerd client install <app>|all [--mode servers|single] [--revert]
+brokerd client adopt <server>[=<connector>]... [--owner-only] [--dry-run]
+brokerd client restore <server>...
+brokerd reload                                # apply connectors.yaml / secrets.json now instead of within 2s
+brokerd queries push --project <key> --file queries.yaml   # named ClickHouse queries agents may run
+brokerd grant mint|list|revoke                # agent grants (a control plane normally does this)
+brokerd receipts --limit 50                   # what ran, for whom, with what outcome
+brokerd-probe -raw -url http://127.0.0.1:8890/mcp/<connector> -token "$TOKEN" [-tool <t> -args '{...}']
+```
+
+`client install` modes: `servers` (default) gives each app one entry per server under its original name plus a
+`broker` entry that carries servers added mid-chat and on-demand servers; `single` gives one `broker` entry with
+every tool (what agents use; measured equal for low-effort models in [docs/eval.md](docs/eval.md)). Installed apps
+are managed: when a server is added or removed, the daemon updates their configs.
 
 ## Layout
 
 ```
-cmd/brokerd            daemon + CLI subcommands        pkg/mcpfront      per-connector MCP servers
-cmd/brokerd-probe      shell MCP client                pkg/api           front mux, admin socket, admin client
-pkg/auth               tokens, grants, capabilities    pkg/adapters/*    clickhouse, wordpress, memory
-pkg/catalog            operations, embedded catalogs   pkg/audit         receipts
-pkg/connectors         connectors.yaml                 pkg/compact       response trimming
-pkg/adapters/upstream  stdio child hosting, hooks, relay
-pkg/policy             the single authorization point  pkg/durable       SQLite schema
+cmd/brokerd             daemon + CLI (auth, client adopt/install/restore, grants, receipts)
+cmd/brokerd-probe       shell MCP client
+cmd/mockmcp             test server exercising every MCP feature the broker passes through
+pkg/adapters/upstream   hosts stdio and remote servers: discovery, hooks, response filters, relay
+pkg/mcpfront            the MCP endpoints apps and agents connect to; on-demand discovery
+pkg/remoteauth          OAuth sign-in and token refresh for remote servers
+pkg/auth  pkg/policy    grants, capabilities, the single authorization point
+pkg/catalog             operations per connector (embedded, overlay, synthesized)
+pkg/connectors          connectors.yaml
+pkg/reload  pkg/pins    hot reload; pinned npx/uvx installs
+pkg/audit  pkg/durable  receipts, SQLite
+test/e2e                the broker against cmd/mockmcp
+bench/                  memory and context benchmarks
+skills/                 an agent skill for operating brokerd
 ```
 
 ## Development
@@ -170,6 +146,9 @@ pkg/policy             the single authorization point  pkg/durable       SQLite 
 go test ./...
 go test -race ./pkg/mcpfront ./pkg/auth
 go vet ./... && gofmt -l .
+go test ./test/e2e -run '^$' -bench . -benchtime 2000x   # latency, direct vs through the broker
+python3 bench/memory_bench.py --copies <server>=<apps> ... # memory, one copy per app vs shared
+python3 bench/context_bench.py                             # context tokens per chat, Claude Code and Codex
 ```
 
 Releases: open a `release/X.Y.Z` branch whose `CHANGELOG.md` top entry is `## [X.Y.Z] - date`, raise a PR into

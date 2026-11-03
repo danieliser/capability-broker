@@ -12,6 +12,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 - WordPress drafts admit only the supported `core/create-post` and `gk-block-mcp/create-post` schemas, with draft status forced and post type/site/run limits checked. Update abilities no longer resolve as drafting: forcing draft on an update could unpublish a live post.
 - Block MCP `resolve-url` maps to `content.read`; `get-page-blocks` forces `persist_refs: false` so a read cannot silently persist block references.
 - `skills/brokerd-operations`: an agent skill for running the broker.
+- `brokerd client install` defaults to `--mode servers`: one entry per server under its original name, so apps see no difference.
+- `?ondemand=all` on the aggregate endpoint serves every connector through discovery (benchmarks, A/B tests).
+- Benchmarks (`docs/benchmarks.md`, `bench/`, `test/e2e` benchmarks): memory 2,424 MB → 645 MB with every app open, ≈0.6 ms added per call, 1.05 MB of tool definitions → 1.6 KB on demand.
+- README rewritten around what the broker does for an owner; the full feature list moved to `docs/reference.md`.
 
 ## [0.8.0] - 2026-11-02
 

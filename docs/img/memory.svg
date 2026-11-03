@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 384" width="720" height="384" role="img" aria-labelledby="t d">
+<title id="t">Memory per MCP server: one copy per app vs one shared copy in brokerd</title>
+<desc id="d">With every app open, the eight local MCP servers used 2424 MB as one copy per app; under brokerd one shared copy uses 570 MB plus 75 MB for the broker.</desc>
+<style>
+.s{fill:#fcfcfb}.t1{fill:#0b0b0b}.t2{fill:#52514e}.g{stroke:#e4e3df}.a{fill:#eb6834}.b{fill:#2a78d6}
+text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+@media (prefers-color-scheme:dark){.s{fill:#1a1a19}.t1{fill:#f0efec}.t2{fill:#c3c2b7}.g{stroke:#33332f}.a{fill:#d95926}.b{fill:#3987e5}}
+</style>
+<rect class="s" width="720" height="384" rx="8"/>
+<text class="t1" x="20" y="28" font-size="15" font-weight="600">Memory with every app open: 2.4 GB → 0.65 GB</text>
+<rect class="a" x="20" y="40" width="10" height="10" rx="2"/><text class="t2" x="36" y="49" font-size="12">one copy per app (before)</text>
+<rect class="b" x="210" y="40" width="10" height="10" rx="2"/><text class="t2" x="226" y="49" font-size="12">one shared copy in brokerd</text>
+<text class="t1" x="130" y="79" font-size="12" text-anchor="end">wp-mcp-router</text>
+<rect class="a" x="140" y="64" width="510.0" height="11" rx="3"><title>wp-mcp-router: 470 MB (94 MB × 5 apps)</title></rect>
+<text class="t2" x="656.0" y="74" font-size="11">470 MB · ×5</text>
+<rect class="b" x="140" y="77" width="102.0" height="11" rx="3"><title>wp-mcp-router: 94 MB shared</title></rect>
+<text class="t2" x="248.0" y="87" font-size="11">94 MB</text>
+<text class="t1" x="130" y="113" font-size="12" text-anchor="end">clickhouse</text>
+<rect class="a" x="140" y="98" width="429.7" height="11" rx="3"><title>clickhouse: 396 MB (99 MB × 4 apps)</title></rect>
+<text class="t2" x="575.7" y="108" font-size="11">396 MB · ×4</text>
+<rect class="b" x="140" y="111" width="107.4" height="11" rx="3"><title>clickhouse: 99 MB shared</title></rect>
+<text class="t2" x="253.4" y="121" font-size="11">99 MB</text>
+<text class="t1" x="130" y="147" font-size="12" text-anchor="end">memory</text>
+<rect class="a" x="140" y="132" width="428.6" height="11" rx="3"><title>memory: 395 MB (79 MB × 5 apps)</title></rect>
+<text class="t2" x="574.6" y="142" font-size="11">395 MB · ×5</text>
+<rect class="b" x="140" y="145" width="85.7" height="11" rx="3"><title>memory: 79 MB shared</title></rect>
+<text class="t2" x="231.7" y="155" font-size="11">79 MB</text>
+<text class="t1" x="130" y="181" font-size="12" text-anchor="end">dataforseo</text>
+<rect class="a" x="140" y="166" width="320.1" height="11" rx="3"><title>dataforseo: 295 MB (59 MB × 5 apps)</title></rect>
+<text class="t2" x="466.1" y="176" font-size="11">295 MB · ×5</text>
+<rect class="b" x="140" y="179" width="64.0" height="11" rx="3"><title>dataforseo: 59 MB shared</title></rect>
+<text class="t2" x="210.0" y="189" font-size="11">59 MB</text>
+<text class="t1" x="130" y="215" font-size="12" text-anchor="end">gmail-work</text>
+<rect class="a" x="140" y="200" width="238.7" height="11" rx="3"><title>gmail-work: 220 MB (44 MB × 5 apps)</title></rect>
+<text class="t2" x="384.7" y="210" font-size="11">220 MB · ×5</text>
+<rect class="b" x="140" y="213" width="47.7" height="11" rx="3"><title>gmail-work: 44 MB shared</title></rect>
+<text class="t2" x="193.7" y="223" font-size="11">44 MB</text>
+<text class="t1" x="130" y="249" font-size="12" text-anchor="end">metabase</text>
+<rect class="a" x="140" y="234" width="236.6" height="11" rx="3"><title>metabase: 218 MB (109 MB × 2 apps)</title></rect>
+<text class="t2" x="382.6" y="244" font-size="11">218 MB · ×2</text>
+<rect class="b" x="140" y="247" width="118.3" height="11" rx="3"><title>metabase: 109 MB shared</title></rect>
+<text class="t2" x="264.3" y="257" font-size="11">109 MB</text>
+<text class="t1" x="130" y="283" font-size="12" text-anchor="end">gmail-jarvis</text>
+<rect class="a" x="140" y="268" width="233.3" height="11" rx="3"><title>gmail-jarvis: 215 MB (43 MB × 5 apps)</title></rect>
+<text class="t2" x="379.3" y="278" font-size="11">215 MB · ×5</text>
+<rect class="b" x="140" y="281" width="46.7" height="11" rx="3"><title>gmail-jarvis: 43 MB shared</title></rect>
+<text class="t2" x="192.7" y="291" font-size="11">43 MB</text>
+<text class="t1" x="130" y="317" font-size="12" text-anchor="end">gmail-personal</text>
+<rect class="a" x="140" y="302" width="233.3" height="11" rx="3"><title>gmail-personal: 215 MB (43 MB × 5 apps)</title></rect>
+<text class="t2" x="379.3" y="312" font-size="11">215 MB · ×5</text>
+<rect class="b" x="140" y="315" width="46.7" height="11" rx="3"><title>gmail-personal: 43 MB shared</title></rect>
+<text class="t2" x="192.7" y="325" font-size="11">43 MB</text>
+<text class="t2" x="20" y="348" font-size="11">Resident memory, M2 Max, 2026-11-03. "Before" counts one copy per app that had the server configured;</text><text class="t2" x="20" y="362" font-size="11">apps that start a copy per chat session use more.</text>
+</svg>
