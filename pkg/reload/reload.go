@@ -273,8 +273,10 @@ func digest(s *connectors.Spec) string {
 		Expose            string
 		Tools             *connectors.ToolFilter
 		Response          *connectors.ResponseFilter
+		OnDemand          bool
+		IdleStop          time.Duration
 	}{s.Command, s.Cwd, s.URL, s.Args, s.Env, s.Headers, s.OAuth, s.StartupTimeout, s.CallTimeout, s.OwnerOnly,
-		s.Clients, s.Strip, s.Expose, s.Tools, s.Response})
+		s.Clients, s.Strip, s.Expose, s.Tools, s.Response, s.OnDemandStart, s.IdleStop})
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
 }
