@@ -73,6 +73,7 @@ type liveServer struct {
 	toolOwner   map[string]string // exported name → connector
 	allOnDemand bool              // aggregate only (?ondemand=all): every connector reached through discovery
 	extHash     map[string]string // "p:"+prompt name | "r:"+uri | "t:"+uri template → definition hash
+	lastUsed    atomic.Int64      // unix nanos; idle servers are dropped by SweepIdle
 }
 
 type errorBody struct {
@@ -220,6 +221,7 @@ func (f *Front) serverFor(ctx context.Context, endpoint string, g *auth.Grant, e
 		f.servers[key] = ls
 	}
 	f.mu.Unlock()
+	ls.lastUsed.Store(time.Now().UnixNano())
 	if !ok {
 		f.refreshOne(ctx, ls, true)
 	}
@@ -482,6 +484,29 @@ func (f *Front) refreshOne(ctx context.Context, ls *liveServer, initial bool) {
 type def struct {
 	connector, upstream string
 	tool                catalog.Tool
+}
+
+// SweepIdle drops cached servers nobody has used for maxIdle (a new request rebuilds one in milliseconds). Each
+// app, grant and option set gets its own server, and changed instructions create new ones, so without this the
+// cache only grows.
+func (f *Front) SweepIdle(ctx context.Context, maxIdle time.Duration) {
+	t := time.NewTicker(maxIdle / 4)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+		cutoff := time.Now().Add(-maxIdle).UnixNano()
+		f.mu.Lock()
+		for k, ls := range f.servers {
+			if ls.lastUsed.Load() < cutoff {
+				delete(f.servers, k)
+			}
+		}
+		f.mu.Unlock()
+	}
 }
 
 // Invalidate drops cached servers for a grant (after revocation), or every server when grantID is empty.

@@ -18,7 +18,8 @@ capabilities:
 brokerd is one local daemon (`127.0.0.1:8890`, admin socket in `~/.brokerd/`) that runs every MCP server once and
 serves it to Claude Code, Codex, Cursor, OpenCode and Claude Desktop (owner tokens) and to named agents (per-wake
 grants). Servers are configured in one place: `~/.brokerd/connectors.yaml` (hot-reloaded within 2s); credentials in
-`~/.brokerd/secrets.json`, referenced as `${secret:NAME}`.
+`~/.brokerd/secrets.json` (set with `brokerd secret set NAME`, value on stdin), referenced as `${secret:NAME}`.
+To add a new server, use the `mcp-install` skill.
 
 ## When to use
 
@@ -59,6 +60,7 @@ client. `--force` signs in again, `--sign-out` forgets it.
 ### 4. Shape a server (all optional, per connector)
 ```yaml
 expose: broker            # not preloaded; reached via search_tools / describe_tool / call_tool on the broker entry
+on_demand: true           # not started until called (tools listed from cache); idle_stop: 10m stops it again
 clients: [claude-code]    # or [!cursor]
 tools: { exclude: ["delete_*"] }   # hidden and refused for every caller (the hard stop)
 strip: [outputSchema, annotations, meta, prompts, resources, instructions, structured]

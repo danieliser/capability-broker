@@ -31,6 +31,9 @@ import (
 
 var mockBin string
 
+// adapters holds the last newEnv's adapters, for lifecycle assertions.
+var adapters map[string]*upstream.Adapter
+
 func TestMain(m *testing.M) {
 	dir, _ := os.MkdirTemp("", "mockmcp")
 	mockBin = filepath.Join(dir, "mockmcp")
@@ -59,6 +62,8 @@ func newEnv(t testing.TB, specs ...*connectors.Spec) *env {
 	reg := registry.New()
 	f := &mcpfront.Front{Store: auth.NewStore(db), Catalog: cat, Audit: audit.NewWriter(db), Registry: reg,
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Stateless: true}
+	cacheDir := t.TempDir()
+	adapters = map[string]*upstream.Adapter{}
 	for _, sp := range specs {
 		if sp.StartupTimeout == 0 {
 			sp.StartupTimeout = 30 * time.Second
@@ -68,6 +73,13 @@ func newEnv(t testing.TB, specs ...*connectors.Spec) *env {
 		}
 		ad := upstream.New(sp, cat, nil)
 		ad.OnChange = func() { f.Refresh(context.Background()) }
+		ad.CacheDir = cacheDir
+		if sp.IdleStop > 0 {
+			wctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+			go ad.WatchIdle(wctx)
+		}
+		adapters[sp.Name] = ad
 		reg.Set(sp.Name, ad)
 		if err := ad.Start(context.Background()); err != nil {
 			t.Fatalf("start %s: %v", sp.Name, err)
@@ -308,3 +320,35 @@ func (e *env) rawPost(t *testing.T, token, path string) int {
 }
 
 func mustJSON(v any) string { b, _ := json.Marshal(v); return string(b) }
+
+func TestIdleStopKeepsListingAndRestartsOnCall(t *testing.T) {
+	sp := mock("mock")
+	sp.OnDemandStart = true
+	sp.IdleStop = 2 * time.Second
+	e := newEnv(t, sp)
+	ad := adapters["mock"]
+	s := e.connect(t, e.owner(t, "claude-code"), "/mcp/mock", nil)
+	deadline := time.Now().Add(15 * time.Second)
+	for ad.Connected() {
+		if time.Now().After(deadline) {
+			t.Fatal("upstream never stopped after idle_stop")
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if toolNamed(t, s, "echo") == nil {
+		t.Fatal("tools vanished while the upstream was stopped")
+	}
+	r := call(t, s, "echo", map[string]any{"text": "wake"})
+	if sc, _ := r.StructuredContent.(map[string]any); sc["echo"] != "wake" {
+		t.Fatalf("call after idle stop: %#v", r.StructuredContent)
+	}
+	if !ad.Connected() {
+		t.Error("call did not start the upstream again")
+	}
+	// A fresh adapter lists from the cache without starting anything.
+	fresh := upstream.New(sp, e.front.Catalog, nil)
+	fresh.CacheDir = ad.CacheDir
+	if !fresh.LoadCache() || fresh.Connected() || !fresh.Ready() {
+		t.Fatal("cache did not make a cold on-demand connector listable")
+	}
+}

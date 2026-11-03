@@ -58,6 +58,8 @@ func runSubcommand(name string, args []string) int {
 		return 0
 	case "auth":
 		return runAuth(args)
+	case "secret":
+		return runSecret(args)
 	case "client":
 		return runClient(ctx, args)
 	case "grant":

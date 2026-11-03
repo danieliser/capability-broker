@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"sync"
 	"syscall"
 	"time"
@@ -38,7 +39,7 @@ import (
 func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
-		case "auth", "client", "grant", "queries", "receipts", "status", "reload":
+		case "auth", "secret", "client", "grant", "queries", "receipts", "status", "reload":
 			os.Exit(runSubcommand(os.Args[1], os.Args[2:]))
 		}
 	}
@@ -79,6 +80,14 @@ func main() {
 }
 
 func run(cfg config.Config, stateless bool) error {
+	// Memory: a soft ceiling and a lower GC target unless the environment sets its own. The live heap is ~25 MB
+	// (mostly upstream tool schemas); Go's default GOGC=100 lets the process grow to twice that before collecting.
+	if os.Getenv("GOMEMLIMIT") == "" {
+		debug.SetMemoryLimit(48 << 20)
+	}
+	if os.Getenv("GOGC") == "" {
+		debug.SetGCPercent(50)
+	}
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	logger.Info("brokerd starting", "version", buildinfo.Version, "commit", buildinfo.Commit, "data_dir", cfg.DataDir)
 	if err := os.MkdirAll(cfg.DataDir, 0o700); err != nil {
@@ -129,6 +138,7 @@ func run(cfg config.Config, stateless bool) error {
 	defer closeAll(reg, 1500*time.Millisecond)
 	// Hot reload: poll the data-root files, and apply on SIGHUP too.
 	go reloader.Watch(ctx, 2*time.Second)
+	go front.SweepIdle(ctx, 30*time.Minute)
 	// Pins past their TTL are rechecked hourly; a newer version installs beside the old one and swaps in.
 	go func() {
 		t := time.NewTicker(time.Hour)
