@@ -52,6 +52,13 @@ type Adapter struct {
 	Auth *remoteauth.Manager
 	// OnChange is called when the upstream announces a changed tool, prompt or resource list.
 	OnChange func()
+	// CacheDir holds the last discovery for on-demand connectors (tools, prompts, resources, instructions).
+	CacheDir string
+
+	cached   atomic.Bool  // a cached listing is loaded: tools can be listed without starting the upstream
+	lastUsed atomic.Int64 // unix nanos of the last call, for idle_stop
+	inflight atomic.Int32
+	closed   atomic.Bool // replaced or removed: background watchers exit
 
 	extrasMu sync.RWMutex // never held across the child's startup
 	extras   extras
@@ -81,7 +88,10 @@ func (a *Adapter) Instructions() string {
 }
 
 // Ready reports whether the child is connected, without waiting on a start in progress.
-func (a *Adapter) Ready() bool { return a.ready.Load() }
+func (a *Adapter) Ready() bool { return a.ready.Load() || a.cached.Load() }
+
+// Connected reports whether the upstream process or connection is live (Ready also covers a cached listing).
+func (a *Adapter) Connected() bool { return a.ready.Load() }
 
 // catalogConn resolves the connector's catalog at use time: a reload may have replaced it.
 func (a *Adapter) catalogConn() *catalog.Connector {
@@ -115,6 +125,7 @@ func (a *Adapter) Start(ctx context.Context) error {
 }
 
 func (a *Adapter) Close() error {
+	a.closed.Store(true)
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.ready.Store(false)
@@ -244,6 +255,8 @@ func (a *Adapter) ensure(ctx context.Context) (*mcp.ClientSession, *catalog.Conn
 		a.instructions.Store(&in)
 	}
 	a.setExtras(listExtras(cctx, session))
+	go a.saveCache() // takes mu itself; ensure holds it until it returns
+	a.lastUsed.Store(time.Now().UnixNano()) // idle_stop counts from the connect when nothing has called yet
 	a.ready.Store(true)
 	a.log("connector connected", "connector", a.spec.Name, "tools", len(tools), "catalog", conn.Source)
 	if conn.SiteHostsTool != "" {
@@ -265,7 +278,7 @@ func discover(ctx context.Context, s *mcp.ClientSession) ([]catalog.Tool, error)
 			if raw, err := json.Marshal(t.InputSchema); err == nil {
 				_ = json.Unmarshal(raw, &schema)
 			}
-			out = append(out, catalog.Tool{Name: t.Name, Description: t.Description, InputSchema: schema, Upstream: t})
+			out = append(out, toCatalogTool(t))
 		}
 		if res.NextCursor == "" {
 			break
@@ -329,6 +342,9 @@ func (a *Adapter) Health(ctx context.Context) error {
 	s := a.session
 	a.mu.Unlock()
 	if s == nil {
+		if a.cached.Load() {
+			return nil // on demand: idle with a cached listing, starts on the next call
+		}
 		return adapter.Unavailable(a.spec.Name + " is not connected")
 	}
 	_, err := s.ListTools(ctx, &mcp.ListToolsParams{})
@@ -340,8 +356,10 @@ func (a *Adapter) Health(ctx context.Context) error {
 // could satisfy. Owner grants see every exported tool. Transforms and
 // description hooks from the catalog apply per grant.
 func (a *Adapter) Tools(ctx context.Context, g *auth.Grant) ([]catalog.Tool, error) {
-	if _, _, err := a.ensure(ctx); err != nil {
-		return nil, err
+	if !(a.cached.Load() && !a.ready.Load()) {
+		if _, _, err := a.ensure(ctx); err != nil {
+			return nil, err
+		}
 	}
 	a.mu.Lock()
 	tools := a.tools
@@ -466,6 +484,8 @@ func (a *Adapter) transform(name string, t catalog.Tool, cap auth.ConnectorCapab
 // Execute runs the guards, forwards the call to the child with a progress token
 // for the relay, then runs the response hooks and shapes the result.
 func (a *Adapter) Execute(ctx context.Context, call adapter.Call) (*adapter.Result, error) {
+	a.touch()
+	defer a.untouch()
 	if !a.spec.Tools.Allows(call.Tool) {
 		return nil, &adapter.UpstreamError{Code: "BROKER_TOOL_NOT_EXPOSED", Message: call.Tool + " is excluded by the connector's tools filter"}
 	}
@@ -658,4 +678,14 @@ func numberOf(v any) (int, bool) {
 		return int(t), true
 	}
 	return 0, false
+}
+
+type catalogTool = catalog.Tool
+
+func toCatalogTool(t *mcp.Tool) catalog.Tool {
+	schema := map[string]any{}
+	if raw, err := json.Marshal(t.InputSchema); err == nil {
+		_ = json.Unmarshal(raw, &schema)
+	}
+	return catalog.Tool{Name: t.Name, Description: t.Description, InputSchema: schema, Upstream: t}
 }

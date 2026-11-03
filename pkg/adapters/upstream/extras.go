@@ -90,6 +90,8 @@ func (a *Adapter) ResourceTemplates() []*mcp.ResourceTemplate {
 
 // GetPrompt and ReadResource forward to the upstream unchanged.
 func (a *Adapter) GetPrompt(ctx context.Context, name string, args map[string]string) (*mcp.GetPromptResult, error) {
+	a.touch()
+	defer a.untouch()
 	s, _, err := a.ensure(ctx)
 	if err != nil {
 		return nil, err
@@ -100,6 +102,8 @@ func (a *Adapter) GetPrompt(ctx context.Context, name string, args map[string]st
 }
 
 func (a *Adapter) ReadResource(ctx context.Context, uri string) (*mcp.ReadResourceResult, error) {
+	a.touch()
+	defer a.untouch()
 	s, _, err := a.ensure(ctx)
 	if err != nil {
 		return nil, err

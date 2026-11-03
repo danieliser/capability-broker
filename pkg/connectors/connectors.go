@@ -29,6 +29,11 @@ type Spec struct {
 	OAuth *OAuth `yaml:"oauth,omitempty"`
 	// OwnerOnly connectors are served to owner client tokens only; agent grants may not name them.
 	OwnerOnly bool `yaml:"owner_only,omitempty"`
+	// OnDemand (`on_demand: true`) does not start the server until a call needs it; its tools, prompts and
+	// resources are listed from the last discovery (cached in the data dir). IdleStop stops a started server after
+	// that long without calls (on-demand servers default to 10m); the next call starts it again.
+	OnDemandStart bool          `yaml:"on_demand,omitempty"`
+	IdleStop      time.Duration `yaml:"idle_stop,omitempty"`
 	// Clients limits which owner clients see this connector (claude-code, claude-desktop, codex, cursor,
 	// opencode); empty means all. "!name" excludes one. Agent grants are governed by their capabilities.
 	Clients []string `yaml:"clients,omitempty"`
@@ -211,6 +216,9 @@ func Load(path string, secrets map[string]string) ([]*Spec, error) {
 		}
 		if spec.CallTimeout <= 0 {
 			spec.CallTimeout = 120 * time.Second
+		}
+		if spec.OnDemandStart && spec.IdleStop <= 0 {
+			spec.IdleStop = 10 * time.Minute
 		}
 		var err error
 		if spec.Env, err = resolveMap(spec.Env, secrets, path, name, "env"); err != nil {
