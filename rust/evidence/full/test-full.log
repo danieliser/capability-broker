@@ -1,0 +1,11 @@
+   Compiling brokerd-rust v0.1.0 (/Users/danieliser/Toolkit/capability-broker/rust)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.34s
+     Running unittests src/main.rs (rust/target/debug/deps/brokerd_rust-db845518ce14efe4)
+
+running 3 tests
+test shaping::tests::recursive_keys_and_unicode ... ok
+test connectors::tests::invalid_reload_is_atomic ... ok
+test connectors::tests::durations_and_filters ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

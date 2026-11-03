@@ -1,8 +1,8 @@
 # Rust full-port attempt — incomplete
 
 This branch is **not at 1:1 parity and is not a drop-in replacement**. It extends
-71eb685's experiment after merging Go main f9fda6d (v0.10.0). The measurements below
-compare the current Rust subset with the complete Go daemon; they cannot determine
+71eb685's experiment after merging Go main f9fda6d (v0.10.0), then refreshed to c97bbfa (v0.10.1). The measurements below
+compare the current Rust subset with the complete Go v0.10.1 daemon; they cannot determine
 how a full Rust port would stack up. In particular Rust does not perform Go's grant
 lookup, policy/catalog processing or full receipt serialization. Do not deploy it.
 
@@ -26,7 +26,7 @@ lookup, policy/catalog processing or full receipt serialization. Do not deploy i
 | Front transport | Sessionless MCP only, explicit loopback port | --stateless=false/session mode, subscriptions to downstream clients and CLI flags missing |
 | Grants/policy | One static fixture owner token only | Hashed grant tokens, owner/agent kinds, capabilities, narrowing, revocation, TTL, owner_only grant rejection, embedded/overlay/synthesized catalogs, WP/memory constraints, counters and named ClickHouse queries missing |
 | Agent compaction | Connector response compaction only | No agent grant front, operation-specific fields or verbose semantics |
-| Receipts | WAL/FULL SQLite intent/outcome, append-only triggers; failed intent denies call | Incompatible MVP schema; no Go grant identity, argument hashes/summaries, sizes, policy decisions or denial receipts; do not point it at Go's database |
+| Receipts | WAL/FULL SQLite intent/outcome (Go v0.10.1 uses NORMAL + batched outcomes), append-only triggers; failed intent denies call | Incompatible MVP schema; no Go grant identity, argument hashes/summaries, sizes, policy decisions or denial receipts; do not point it at Go's database |
 | Admin / CLI / clients | Explicit DATA_DIR OWNER_TOKEN_FILE PORT launch retained | Unix admin API and every requested CLI command (status/grant/queries/receipts/reload/auth/secret/client install/adopt/restore), Codex TOML, Claude Desktop and managed sync missing |
 | Tests | Rust config/filter units, owner/lifecycle and local HTTP smoke against Go mock; original Go suite passes | Not a port of the complete Go e2e suite; no Rust policy/grants/client editing tests because those modules are absent |
 
@@ -36,7 +36,7 @@ Measured 2026-11-03 on Apple M2 Max, macOS 26.5.2 arm64; rustc/cargo 1.97.1, Go 
 
 - `cargo build --release --locked --manifest-path rust/Cargo.toml`; stripped thin-LTO
   Rust binary with bundled SQLite. Go: `CGO_ENABLED=0 go build -trimpath -ldflags='-s -w'`.
-  Go source under cmd/ and pkg/ is unchanged from main f9fda6d.
+  Go source under cmd/ and pkg/ is identical to main c97bbfa.
 - `python3 rust/bench/run.py`: Go port 8990, Rust 8991, each with a separate private
   data directory and HOME. Both serve the same freshly built Go cmd/mockmcp.
   One shared Go SDK client/HTTP transport calls echo sequentially: three batches
@@ -68,16 +68,16 @@ Measured 2026-11-03 on Apple M2 Max, macOS 26.5.2 arm64; rustc/cargo 1.97.1, Go 
 
 ## Measurements
 
-| Metric | Go main (full daemon) | Rust subset |
+| Metric | Go main v0.10.1 (full daemon) | Rust subset |
 |---|---:|---:|
-| Echo latency, median of 3 × 2,000 batch medians (ms) | 1.172 | 0.373 |
-| Idle daemon RSS (MiB) | 23.17 | 14.31 |
-| Daemon RSS after 2,000 calls (MiB) | 31.53 | 15.50 |
-| Daemon RSS with 300 mock definitions (MiB) | 30.12 | 19.27 |
-| Release binary size (MiB) | 13.63 | 15.08 |
-| Startup, median of 3 (ms) | 26.47 | 26.99 |
-| 300-tool startup, one trial (ms) | 139.15 | 474.94 |
-| Physical source lines (different scope) | 8,478 production + 1,878 tests | 1,134 incl. 3 unit tests |
+| Echo latency, median of 3 × 2,000 batch medians (ms) | 0.752 | 0.373 |
+| Idle daemon RSS (MiB) | 24.58 | 14.31 |
+| Daemon RSS after 2,000 calls (MiB) | 34.52 | 15.50 |
+| Daemon RSS with 300 mock definitions (MiB) | 32.94 | 19.33 |
+| Release binary size (MiB) | 13.67 | 15.08 |
+| Startup, median of 3 (ms) | 27.02 | 26.83 |
+| 300-tool startup, one trial (ms) | 138.89 | 474.30 |
+| Physical source lines (different scope) | 8,592 production + 1,878 tests | 1,134 incl. 3 unit tests |
 
 | Release cross-link | Go | Rust |
 |---|---|---|
@@ -88,7 +88,12 @@ Measured 2026-11-03 on Apple M2 Max, macOS 26.5.2 arm64; rustc/cargo 1.97.1, Go 
 
 Native macOS arm64 release build passes. Cross-link attempts were repeated after the final subscription correction. No cross-target binaries were executed.
 
-The first Go startup trial took 570 ms versus 26 ms for its next two; Rust trials were 44/27/25 ms. Three trials are insufficient to explain that outlier. The headline is lower RSS in a smaller Rust implementation, **not** full-parity performance.
+The baseline was refreshed when main advanced during the experiment. The earlier
+v0.10.0 run is preserved in commit 0c3da0a; the table and current raw results use
+v0.10.1. Rust still synchronously commits both phases with FULL durability; Go now
+uses NORMAL and queues outcomes. Different authorization, audit, serialization and
+durability paths prevent attribution of the measured differences to language alone.
+The headline is lower RSS in a smaller Rust implementation, **not** full-parity performance.
 
 ## Verification and remaining work
 

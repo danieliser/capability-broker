@@ -2,3 +2,4 @@
 /.bench/
 !/evidence/*.log
 /bench/__pycache__/
+!/evidence/full/*.log

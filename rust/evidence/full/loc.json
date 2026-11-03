@@ -4,7 +4,7 @@
     "files": 3
   },
   "go_daemon_production": {
-    "physical_lines": 8478,
+    "physical_lines": 8592,
     "files": 35
   },
   "go_tests": {

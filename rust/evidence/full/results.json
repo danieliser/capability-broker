@@ -3,50 +3,50 @@
     "runs": [
       {
         "calls": 2000,
-        "mean_us": 1101.1082705,
-        "median_us": 1050.7295
+        "mean_us": 772.9596665,
+        "median_us": 752.396
       },
       {
         "calls": 2000,
-        "mean_us": 1215.28825,
-        "median_us": 1172.4165
+        "mean_us": 838.4249585,
+        "median_us": 791.5835
       },
       {
         "calls": 2000,
-        "mean_us": 1863.640292,
-        "median_us": 1583.375
+        "mean_us": 784.1567085,
+        "median_us": 750.833
       }
     ],
-    "idle_rss_kib": 23728,
-    "rss_after_2000_kib": 32288,
+    "idle_rss_kib": 25168,
+    "rss_after_2000_kib": 35344,
     "receipts": {
       "intent": 6005,
       "outcome": 6005
     },
-    "binary_bytes": 14287474,
-    "fixture_dir": "/Users/danieliser/Toolkit/capability-broker/rust/.bench/go-1793693013968683000",
+    "binary_bytes": 14338146,
+    "fixture_dir": "/Users/danieliser/Toolkit/capability-broker/rust/.bench/go-1793693196616186000",
     "cold_start_ms": [
-      570.207125,
-      25.991208,
-      26.467666
+      804.265875,
+      27.016,
+      26.465834
     ]
   },
   "rust": {
     "runs": [
       {
         "calls": 2000,
-        "mean_us": 542.9854165,
-        "median_us": 398.583
+        "mean_us": 410.8506665,
+        "median_us": 358.833
       },
       {
         "calls": 2000,
-        "mean_us": 417.3675,
-        "median_us": 372.833
+        "mean_us": 526.015458,
+        "median_us": 373.938
       },
       {
         "calls": 2000,
-        "mean_us": 483.7795835,
-        "median_us": 366.208
+        "mean_us": 433.840583,
+        "median_us": 373.062
       }
     ],
     "idle_rss_kib": 14656,
@@ -56,11 +56,11 @@
       "outcome": 6010
     },
     "binary_bytes": 15816224,
-    "fixture_dir": "/Users/danieliser/Toolkit/capability-broker/rust/.bench/rust-1793693023768053000",
+    "fixture_dir": "/Users/danieliser/Toolkit/capability-broker/rust/.bench/rust-1793693203118144000",
     "cold_start_ms": [
-      44.243458,
-      26.98975,
-      24.78925
+      25.691125,
+      26.830042,
+      27.389666
     ]
   }
 }

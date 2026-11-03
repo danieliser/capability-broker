@@ -1,0 +1,530 @@
+   Compiling aws-lc-sys v0.47.0
+   Compiling hyper v1.12.0
+   Compiling tower v0.5.3
+   Compiling nix v0.31.3
+   Compiling indexmap v2.14.2
+   Compiling ref-cast v1.0.27
+   Compiling num-traits v0.2.19
+   Compiling futures-executor v0.3.34
+   Compiling idna_adapter v1.2.2
+   Compiling foldhash v0.2.0
+   Compiling cpufeatures v0.3.1
+   Compiling thiserror v2.0.21
+   Compiling chacha20 v0.10.2
+   Compiling idna v1.1.0
+   Compiling futures v0.3.34
+   Compiling hashbrown v0.16.1
+   Compiling libsqlite3-sys v0.37.0
+   Compiling tokio-util v0.7.20
+   Compiling url v2.5.8
+   Compiling chrono v0.4.45
+warning: aws-lc-sys@0.47.0: Emitting configuration: cargo:rustc-cfg=universal
+warning: aws-lc-sys@0.47.0: Building with: CC
+warning: aws-lc-sys@0.47.0: Symbol Prefix: Some("aws_lc_0_47_0")
+warning: aws-lc-sys@0.47.0: Target platform: 'x86_64-unknown-linux-gnu'
+warning: aws-lc-sys@0.47.0: Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+warning: aws-lc-sys@0.47.0: Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+warning: aws-lc-sys@0.47.0: Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+warning: aws-lc-sys@0.47.0: Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+warning: aws-lc-sys@0.47.0: Compilation of 'c11.c' failed - Err(Error { kind: ToolNotFound, message: "failed to find tool \"x86_64-linux-gnu-gcc\": No such file or directory (os error 2)" }).
+warning: aws-lc-sys@0.47.0: Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+warning: aws-lc-sys@0.47.0: Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+warning: aws-lc-sys@0.47.0: NOTICE: Build environment source paths might be visible in release binary.
+warning: aws-lc-sys@0.47.0: Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+warning: aws-lc-sys@0.47.0: Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+warning: aws-lc-sys@0.47.0: Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+warning: aws-lc-sys@0.47.0: Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+warning: aws-lc-sys@0.47.0: Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+warning: aws-lc-sys@0.47.0: Assembler does not support flag: -Wa,--debug-prefix-map=/Users/danieliser/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.47.0=
+warning: aws-lc-sys@0.47.0: Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+warning: aws-lc-sys@0.47.0: Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+warning: aws-lc-sys@0.47.0: Compilation of 'stdalign_check.c' failed - Err(Error { kind: ToolNotFound, message: "failed to find tool \"x86_64-linux-gnu-gcc\": No such file or directory (os error 2)" }).
+warning: aws-lc-sys@0.47.0: Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+warning: aws-lc-sys@0.47.0: Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+warning: aws-lc-sys@0.47.0: Compilation of 'builtin_swap_check.c' failed - Err(Error { kind: ToolNotFound, message: "failed to find tool \"x86_64-linux-gnu-gcc\": No such file or directory (os error 2)" }).
+warning: aws-lc-sys@0.47.0: Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+warning: aws-lc-sys@0.47.0: Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+warning: aws-lc-sys@0.47.0: Compilation of 'linux_random_h.c' failed - Err(Error { kind: ToolNotFound, message: "failed to find tool \"x86_64-linux-gnu-gcc\": No such file or directory (os error 2)" }).
+warning: aws-lc-sys@0.47.0: Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+warning: aws-lc-sys@0.47.0: Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+warning: aws-lc-sys@0.47.0: Compilation of 'linux_random_h.c' failed - Err(Error { kind: ToolNotFound, message: "failed to find tool \"x86_64-linux-gnu-gcc\": No such file or directory (os error 2)" }).
+warning: aws-lc-sys@0.47.0: Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+warning: aws-lc-sys@0.47.0: Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+error: failed to run custom build command for `aws-lc-sys v0.47.0`
+
+Caused by:
+  process didn't exit successfully: `/Users/danieliser/Toolkit/capability-broker/rust/target/release/build/aws-lc-sys-e372d4f4903f9783/build-script-main` (exit status: 1)
+  --- stdout
+  cargo:rerun-if-env-changed=AWS_LC_SYS_NO_PREFIX_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_NO_PREFIX
+  cargo:rerun-if-env-changed=AWS_LC_SYS_PREGENERATING_BINDINGS_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_PREGENERATING_BINDINGS
+  cargo:rerun-if-env-changed=AWS_LC_SYS_EXTERNAL_BINDGEN_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_EXTERNAL_BINDGEN
+  cargo:rerun-if-env-changed=AWS_LC_SYS_NO_ASM_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_NO_ASM
+  cargo:rerun-if-env-changed=AWS_LC_SYS_PREBUILT_NASM_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_PREBUILT_NASM
+  cargo:rerun-if-env-changed=AWS_LC_SYS_C_STD_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_C_STD
+  cargo:rerun-if-env-changed=AWS_LC_SYS_CMAKE_BUILDER_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_CMAKE_BUILDER
+  cargo:rerun-if-env-changed=AWS_LC_SYS_NO_PREGENERATED_SRC_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_NO_PREGENERATED_SRC
+  cargo:rerun-if-env-changed=AWS_LC_SYS_SMALL_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_SMALL
+  cargo:rerun-if-env-changed=AWS_LC_SYS_EFFECTIVE_TARGET_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_EFFECTIVE_TARGET
+  cargo:rerun-if-env-changed=AWS_LC_SYS_NO_JITTER_ENTROPY_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_NO_JITTER_ENTROPY
+  cargo:rerun-if-env-changed=AWS_LC_SYS_INCLUDES_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_INCLUDES
+  cargo:rerun-if-env-changed=AWS_LC_SYS_SANITIZER_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_SANITIZER
+  cargo:rerun-if-env-changed=AWS_LC_SYS_LINK_WHOLE_ARCHIVE_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_LINK_WHOLE_ARCHIVE
+  cargo:rerun-if-env-changed=AWS_LC_SYS_STATIC_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_STATIC
+  cargo:rerun-if-env-changed=AWS_LC_SYS_SYSTEM_DIR_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_SYSTEM_DIR
+  cargo:rerun-if-env-changed=AWS_LC_SYS_USE_SYSTEM_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_USE_SYSTEM
+  cargo:rerun-if-env-changed=AWS_LC_SYS_SYSTEM_BINDINGS_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_SYSTEM_BINDINGS
+  cargo:rerun-if-env-changed=AWS_LC_SYS_SYSTEM_SKIP_VERSION_CHECK_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_SYSTEM_SKIP_VERSION_CHECK
+  cargo:warning=Emitting configuration: cargo:rustc-cfg=universal
+  cargo:rustc-cfg=universal
+  cargo:rerun-if-env-changed=OPENSSL_DIR_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=OPENSSL_DIR
+  cargo:rerun-if-env-changed=OPENSSL_INCLUDE_DIR_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=OPENSSL_INCLUDE_DIR
+  cargo:rerun-if-env-changed=OPENSSL_LIB_DIR_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=OPENSSL_LIB_DIR
+  cargo:rerun-if-env-changed=OPENSSL_NO_PKG_CONFIG
+  cargo:rerun-if-env-changed=PKG_CONFIG_ALLOW_CROSS_x86_64-unknown-linux-gnu
+  cargo:rerun-if-env-changed=PKG_CONFIG_ALLOW_CROSS_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=TARGET_PKG_CONFIG_ALLOW_CROSS
+  cargo:rerun-if-env-changed=PKG_CONFIG_ALLOW_CROSS
+  cargo:rerun-if-env-changed=PKG_CONFIG_x86_64-unknown-linux-gnu
+  cargo:rerun-if-env-changed=PKG_CONFIG_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=TARGET_PKG_CONFIG
+  cargo:rerun-if-env-changed=PKG_CONFIG
+  cargo:rerun-if-env-changed=PKG_CONFIG_SYSROOT_DIR_x86_64-unknown-linux-gnu
+  cargo:rerun-if-env-changed=PKG_CONFIG_SYSROOT_DIR_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=TARGET_PKG_CONFIG_SYSROOT_DIR
+  cargo:rerun-if-env-changed=PKG_CONFIG_SYSROOT_DIR
+  cargo:rerun-if-env-changed=AWS_LC_NO_PKG_CONFIG
+  cargo:rerun-if-env-changed=PKG_CONFIG_ALLOW_CROSS_x86_64-unknown-linux-gnu
+  cargo:rerun-if-env-changed=PKG_CONFIG_ALLOW_CROSS_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=TARGET_PKG_CONFIG_ALLOW_CROSS
+  cargo:rerun-if-env-changed=PKG_CONFIG_ALLOW_CROSS
+  cargo:rerun-if-env-changed=PKG_CONFIG_x86_64-unknown-linux-gnu
+  cargo:rerun-if-env-changed=PKG_CONFIG_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=TARGET_PKG_CONFIG
+  cargo:rerun-if-env-changed=PKG_CONFIG
+  cargo:rerun-if-env-changed=PKG_CONFIG_SYSROOT_DIR_x86_64-unknown-linux-gnu
+  cargo:rerun-if-env-changed=PKG_CONFIG_SYSROOT_DIR_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=TARGET_PKG_CONFIG_SYSROOT_DIR
+  cargo:rerun-if-env-changed=PKG_CONFIG_SYSROOT_DIR
+  cargo:rerun-if-env-changed=LIBCRYPTO_NO_PKG_CONFIG
+  cargo:rerun-if-env-changed=PKG_CONFIG_ALLOW_CROSS_x86_64-unknown-linux-gnu
+  cargo:rerun-if-env-changed=PKG_CONFIG_ALLOW_CROSS_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=TARGET_PKG_CONFIG_ALLOW_CROSS
+  cargo:rerun-if-env-changed=PKG_CONFIG_ALLOW_CROSS
+  cargo:rerun-if-env-changed=PKG_CONFIG_x86_64-unknown-linux-gnu
+  cargo:rerun-if-env-changed=PKG_CONFIG_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=TARGET_PKG_CONFIG
+  cargo:rerun-if-env-changed=PKG_CONFIG
+  cargo:rerun-if-env-changed=PKG_CONFIG_SYSROOT_DIR_x86_64-unknown-linux-gnu
+  cargo:rerun-if-env-changed=PKG_CONFIG_SYSROOT_DIR_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=TARGET_PKG_CONFIG_SYSROOT_DIR
+  cargo:rerun-if-env-changed=PKG_CONFIG_SYSROOT_DIR
+  cargo:rerun-if-env-changed=LIBCRYPTO_AWSLC_NO_PKG_CONFIG
+  cargo:rerun-if-env-changed=PKG_CONFIG_ALLOW_CROSS_x86_64-unknown-linux-gnu
+  cargo:rerun-if-env-changed=PKG_CONFIG_ALLOW_CROSS_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=TARGET_PKG_CONFIG_ALLOW_CROSS
+  cargo:rerun-if-env-changed=PKG_CONFIG_ALLOW_CROSS
+  cargo:rerun-if-env-changed=PKG_CONFIG_x86_64-unknown-linux-gnu
+  cargo:rerun-if-env-changed=PKG_CONFIG_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=TARGET_PKG_CONFIG
+  cargo:rerun-if-env-changed=PKG_CONFIG
+  cargo:rerun-if-env-changed=PKG_CONFIG_SYSROOT_DIR_x86_64-unknown-linux-gnu
+  cargo:rerun-if-env-changed=PKG_CONFIG_SYSROOT_DIR_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=TARGET_PKG_CONFIG_SYSROOT_DIR
+  cargo:rerun-if-env-changed=PKG_CONFIG_SYSROOT_DIR
+  cargo:rerun-if-env-changed=CARGO_FEATURE_SSL
+  cargo:warning=Building with: CC
+  cargo:warning=Symbol Prefix: Some("aws_lc_0_47_0")
+  cargo:rerun-if-env-changed=CARGO_FEATURE_SSL
+  cargo:warning=Target platform: 'x86_64-unknown-linux-gnu'
+  cargo:root=/Users/danieliser/Toolkit/capability-broker/rust/target/x86_64-unknown-linux-gnu/release/build/aws-lc-sys-1041c603826ff816/out
+  cargo:rerun-if-env-changed=AWS_LC_SYS_TARGET_CFLAGS_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_TARGET_CFLAGS
+  cargo:rerun-if-env-changed=TARGET_CFLAGS_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=TARGET_CFLAGS
+  cargo:rerun-if-env-changed=AWS_LC_SYS_CFLAGS_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_CFLAGS
+  cargo:rerun-if-env-changed=CFLAGS_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=CFLAGS
+  cargo:rerun-if-env-changed=AWS_LC_SYS_TARGET_CC_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_TARGET_CC
+  cargo:rerun-if-env-changed=TARGET_CC_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=TARGET_CC
+  cargo:rerun-if-env-changed=AWS_LC_SYS_CC_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_CC
+  cargo:rerun-if-env-changed=CC_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=CC
+  cargo:rerun-if-env-changed=AWS_LC_SYS_TARGET_CXX_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_TARGET_CXX
+  cargo:rerun-if-env-changed=TARGET_CXX_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=TARGET_CXX
+  cargo:rerun-if-env-changed=AWS_LC_SYS_CXX_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=AWS_LC_SYS_CXX
+  cargo:rerun-if-env-changed=CXX_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=CXX
+  cargo:rerun-if-env-changed=CC_x86_64-unknown-linux-gnu
+  CC_x86_64-unknown-linux-gnu = None
+  cargo:rerun-if-env-changed=CC_x86_64_unknown_linux_gnu
+  CC_x86_64_unknown_linux_gnu = None
+  cargo:rerun-if-env-changed=TARGET_CC
+  TARGET_CC = None
+  cargo:rerun-if-env-changed=CC
+  CC = None
+  cargo:rerun-if-env-changed=CROSS_COMPILE
+  CROSS_COMPILE = None
+  PATH = Some(/Users/danieliser/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Users/danieliser/.local/bin:/opt/homebrew/Caskroom/codex/0.166.0/codex-path:/Users/danieliser/.codex/tmp/arg0-macos/codex-arg0Md3eqq:/Users/danieliser/.grok/bin:/Users/danieliser/.autovault/bin:/Users/danieliser/Toolkit/bin:/Users/danieliser/.antigravity/antigravity/bin:/Users/danieliser/.bun/bin:/Users/danieliser/.nvm/versions/node/v22.19.0/bin:/Users/danieliser/.pyenv/shims:/Users/danieliser/Toolkit/persistence/cli/bin:/Users/danieliser/.composer/vendor/bin:/Users/danieliser/bin:/opt/homebrew/opt/postgresql@16/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/danieliser/.cargo/bin:/Users/danieliser/.orbstack/bin:/Users/danieliser/.lmstudio/bin:/Users/danieliser/.orbstack/bin)
+  cargo:rerun-if-env-changed=CC_ENABLE_DEBUG_OUTPUT
+  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+  cargo:rerun-if-env-changed=CPATH
+  cargo:rerun-if-env-changed=C_INCLUDE_PATH
+  cargo:rerun-if-env-changed=CPLUS_INCLUDE_PATH
+  cargo:rerun-if-env-changed=OBJC_INCLUDE_PATH
+  cargo:rerun-if-env-changed=OBJCPLUS_INCLUDE_PATH
+  cargo:rerun-if-env-changed=COMPILER_PATH
+  cargo:rerun-if-env-changed=SOURCE_DATE_EPOCH
+  cargo:rerun-if-env-changed=GCC_EXEC_PREFIX
+  cargo:rerun-if-env-changed=DEVELOPER_DIR
+  cargo:rerun-if-env-changed=TOOLCHAINS
+  cargo:rerun-if-env-changed=SDKROOT
+  cargo:rerun-if-env-changed=CRATE_CC_NO_DEFAULTS
+  CRATE_CC_NO_DEFAULTS = None
+  cargo:rerun-if-env-changed=CFLAGS
+  CFLAGS = None
+  cargo:rerun-if-env-changed=TARGET_CFLAGS
+  TARGET_CFLAGS = None
+  cargo:rerun-if-env-changed=CFLAGS_x86_64_unknown_linux_gnu
+  CFLAGS_x86_64_unknown_linux_gnu = None
+  cargo:rerun-if-env-changed=CFLAGS_x86_64-unknown-linux-gnu
+  CFLAGS_x86_64-unknown-linux-gnu = None
+  CC_x86_64-unknown-linux-gnu = None
+  CC_x86_64_unknown_linux_gnu = None
+  TARGET_CC = None
+  CC = None
+  CROSS_COMPILE = None
+  PATH = Some(/Users/danieliser/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Users/danieliser/.local/bin:/opt/homebrew/Caskroom/codex/0.166.0/codex-path:/Users/danieliser/.codex/tmp/arg0-macos/codex-arg0Md3eqq:/Users/danieliser/.grok/bin:/Users/danieliser/.autovault/bin:/Users/danieliser/Toolkit/bin:/Users/danieliser/.antigravity/antigravity/bin:/Users/danieliser/.bun/bin:/Users/danieliser/.nvm/versions/node/v22.19.0/bin:/Users/danieliser/.pyenv/shims:/Users/danieliser/Toolkit/persistence/cli/bin:/Users/danieliser/.composer/vendor/bin:/Users/danieliser/bin:/opt/homebrew/opt/postgresql@16/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/danieliser/.cargo/bin:/Users/danieliser/.orbstack/bin:/Users/danieliser/.lmstudio/bin:/Users/danieliser/.orbstack/bin)
+  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+  CRATE_CC_NO_DEFAULTS = None
+  CFLAGS = None
+  TARGET_CFLAGS = None
+  CFLAGS_x86_64_unknown_linux_gnu = None
+  CFLAGS_x86_64-unknown-linux-gnu = None
+  CC_x86_64-unknown-linux-gnu = None
+  CC_x86_64_unknown_linux_gnu = None
+  TARGET_CC = None
+  CC = None
+  CROSS_COMPILE = None
+  PATH = Some(/Users/danieliser/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Users/danieliser/.local/bin:/opt/homebrew/Caskroom/codex/0.166.0/codex-path:/Users/danieliser/.codex/tmp/arg0-macos/codex-arg0Md3eqq:/Users/danieliser/.grok/bin:/Users/danieliser/.autovault/bin:/Users/danieliser/Toolkit/bin:/Users/danieliser/.antigravity/antigravity/bin:/Users/danieliser/.bun/bin:/Users/danieliser/.nvm/versions/node/v22.19.0/bin:/Users/danieliser/.pyenv/shims:/Users/danieliser/Toolkit/persistence/cli/bin:/Users/danieliser/.composer/vendor/bin:/Users/danieliser/bin:/opt/homebrew/opt/postgresql@16/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/danieliser/.cargo/bin:/Users/danieliser/.orbstack/bin:/Users/danieliser/.lmstudio/bin:/Users/danieliser/.orbstack/bin)
+  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+  CRATE_CC_NO_DEFAULTS = None
+  CFLAGS = None
+  TARGET_CFLAGS = None
+  CFLAGS_x86_64_unknown_linux_gnu = None
+  CFLAGS_x86_64-unknown-linux-gnu = None
+  cargo:rerun-if-env-changed=CC_FORCE_DISABLE
+  CC_FORCE_DISABLE = None
+  CC_x86_64-unknown-linux-gnu = None
+  CC_x86_64_unknown_linux_gnu = None
+  TARGET_CC = None
+  CC = None
+  CROSS_COMPILE = None
+  PATH = Some(/Users/danieliser/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Users/danieliser/.local/bin:/opt/homebrew/Caskroom/codex/0.166.0/codex-path:/Users/danieliser/.codex/tmp/arg0-macos/codex-arg0Md3eqq:/Users/danieliser/.grok/bin:/Users/danieliser/.autovault/bin:/Users/danieliser/Toolkit/bin:/Users/danieliser/.antigravity/antigravity/bin:/Users/danieliser/.bun/bin:/Users/danieliser/.nvm/versions/node/v22.19.0/bin:/Users/danieliser/.pyenv/shims:/Users/danieliser/Toolkit/persistence/cli/bin:/Users/danieliser/.composer/vendor/bin:/Users/danieliser/bin:/opt/homebrew/opt/postgresql@16/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/danieliser/.cargo/bin:/Users/danieliser/.orbstack/bin:/Users/danieliser/.lmstudio/bin:/Users/danieliser/.orbstack/bin)
+  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+  CRATE_CC_NO_DEFAULTS = None
+  CFLAGS = None
+  TARGET_CFLAGS = None
+  CFLAGS_x86_64_unknown_linux_gnu = None
+  CFLAGS_x86_64-unknown-linux-gnu = None
+  cargo:warning=Compilation of 'c11.c' failed - Err(Error { kind: ToolNotFound, message: "failed to find tool \"x86_64-linux-gnu-gcc\": No such file or directory (os error 2)" }).
+  CC_x86_64-unknown-linux-gnu = None
+  CC_x86_64_unknown_linux_gnu = None
+  TARGET_CC = None
+  CC = None
+  CROSS_COMPILE = None
+  PATH = Some(/Users/danieliser/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Users/danieliser/.local/bin:/opt/homebrew/Caskroom/codex/0.166.0/codex-path:/Users/danieliser/.codex/tmp/arg0-macos/codex-arg0Md3eqq:/Users/danieliser/.grok/bin:/Users/danieliser/.autovault/bin:/Users/danieliser/Toolkit/bin:/Users/danieliser/.antigravity/antigravity/bin:/Users/danieliser/.bun/bin:/Users/danieliser/.nvm/versions/node/v22.19.0/bin:/Users/danieliser/.pyenv/shims:/Users/danieliser/Toolkit/persistence/cli/bin:/Users/danieliser/.composer/vendor/bin:/Users/danieliser/bin:/opt/homebrew/opt/postgresql@16/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/danieliser/.cargo/bin:/Users/danieliser/.orbstack/bin:/Users/danieliser/.lmstudio/bin:/Users/danieliser/.orbstack/bin)
+  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+  cargo:rerun-if-env-changed=CC_ENABLE_DEBUG_OUTPUT
+  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+  CRATE_CC_NO_DEFAULTS = None
+  CFLAGS = None
+  TARGET_CFLAGS = None
+  CFLAGS_x86_64_unknown_linux_gnu = None
+  CFLAGS_x86_64-unknown-linux-gnu = None
+  cargo:warning=NOTICE: Build environment source paths might be visible in release binary.
+  CC_x86_64-unknown-linux-gnu = None
+  CC_x86_64_unknown_linux_gnu = None
+  TARGET_CC = None
+  CC = None
+  CROSS_COMPILE = None
+  PATH = Some(/Users/danieliser/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Users/danieliser/.local/bin:/opt/homebrew/Caskroom/codex/0.166.0/codex-path:/Users/danieliser/.codex/tmp/arg0-macos/codex-arg0Md3eqq:/Users/danieliser/.grok/bin:/Users/danieliser/.autovault/bin:/Users/danieliser/Toolkit/bin:/Users/danieliser/.antigravity/antigravity/bin:/Users/danieliser/.bun/bin:/Users/danieliser/.nvm/versions/node/v22.19.0/bin:/Users/danieliser/.pyenv/shims:/Users/danieliser/Toolkit/persistence/cli/bin:/Users/danieliser/.composer/vendor/bin:/Users/danieliser/bin:/opt/homebrew/opt/postgresql@16/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/danieliser/.cargo/bin:/Users/danieliser/.orbstack/bin:/Users/danieliser/.lmstudio/bin:/Users/danieliser/.orbstack/bin)
+  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+  cargo:rerun-if-env-changed=CC_ENABLE_DEBUG_OUTPUT
+  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+  CRATE_CC_NO_DEFAULTS = None
+  CFLAGS = None
+  TARGET_CFLAGS = None
+  CFLAGS_x86_64_unknown_linux_gnu = None
+  CFLAGS_x86_64-unknown-linux-gnu = None
+  cargo:rerun-if-env-changed=CC_x86_64-unknown-linux-gnu
+  CC_x86_64-unknown-linux-gnu = None
+  cargo:rerun-if-env-changed=CC_x86_64_unknown_linux_gnu
+  CC_x86_64_unknown_linux_gnu = None
+  cargo:rerun-if-env-changed=TARGET_CC
+  TARGET_CC = None
+  cargo:rerun-if-env-changed=CC
+  CC = None
+  cargo:rerun-if-env-changed=CROSS_COMPILE
+  CROSS_COMPILE = None
+  PATH = Some(/Users/danieliser/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Users/danieliser/.local/bin:/opt/homebrew/Caskroom/codex/0.166.0/codex-path:/Users/danieliser/.codex/tmp/arg0-macos/codex-arg0Md3eqq:/Users/danieliser/.grok/bin:/Users/danieliser/.autovault/bin:/Users/danieliser/Toolkit/bin:/Users/danieliser/.antigravity/antigravity/bin:/Users/danieliser/.bun/bin:/Users/danieliser/.nvm/versions/node/v22.19.0/bin:/Users/danieliser/.pyenv/shims:/Users/danieliser/Toolkit/persistence/cli/bin:/Users/danieliser/.composer/vendor/bin:/Users/danieliser/bin:/opt/homebrew/opt/postgresql@16/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/danieliser/.cargo/bin:/Users/danieliser/.orbstack/bin:/Users/danieliser/.lmstudio/bin:/Users/danieliser/.orbstack/bin)
+  cargo:rerun-if-env-changed=CC_ENABLE_DEBUG_OUTPUT
+  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+  cargo:rerun-if-env-changed=CPATH
+  cargo:rerun-if-env-changed=C_INCLUDE_PATH
+  cargo:rerun-if-env-changed=CPLUS_INCLUDE_PATH
+  cargo:rerun-if-env-changed=OBJC_INCLUDE_PATH
+  cargo:rerun-if-env-changed=OBJCPLUS_INCLUDE_PATH
+  cargo:rerun-if-env-changed=COMPILER_PATH
+  cargo:rerun-if-env-changed=SOURCE_DATE_EPOCH
+  cargo:rerun-if-env-changed=GCC_EXEC_PREFIX
+  cargo:rerun-if-env-changed=DEVELOPER_DIR
+  cargo:rerun-if-env-changed=TOOLCHAINS
+  cargo:rerun-if-env-changed=SDKROOT
+  cargo:rerun-if-env-changed=CRATE_CC_NO_DEFAULTS
+  CRATE_CC_NO_DEFAULTS = None
+  cargo:rerun-if-env-changed=CFLAGS
+  CFLAGS = None
+  cargo:rerun-if-env-changed=TARGET_CFLAGS
+  TARGET_CFLAGS = None
+  cargo:rerun-if-env-changed=CFLAGS_x86_64_unknown_linux_gnu
+  CFLAGS_x86_64_unknown_linux_gnu = None
+  cargo:rerun-if-env-changed=CFLAGS_x86_64-unknown-linux-gnu
+  CFLAGS_x86_64-unknown-linux-gnu = None
+  CC_x86_64-unknown-linux-gnu = None
+  CC_x86_64_unknown_linux_gnu = None
+  TARGET_CC = None
+  CC = None
+  CROSS_COMPILE = None
+  PATH = Some(/Users/danieliser/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Users/danieliser/.local/bin:/opt/homebrew/Caskroom/codex/0.166.0/codex-path:/Users/danieliser/.codex/tmp/arg0-macos/codex-arg0Md3eqq:/Users/danieliser/.grok/bin:/Users/danieliser/.autovault/bin:/Users/danieliser/Toolkit/bin:/Users/danieliser/.antigravity/antigravity/bin:/Users/danieliser/.bun/bin:/Users/danieliser/.nvm/versions/node/v22.19.0/bin:/Users/danieliser/.pyenv/shims:/Users/danieliser/Toolkit/persistence/cli/bin:/Users/danieliser/.composer/vendor/bin:/Users/danieliser/bin:/opt/homebrew/opt/postgresql@16/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/danieliser/.cargo/bin:/Users/danieliser/.orbstack/bin:/Users/danieliser/.lmstudio/bin:/Users/danieliser/.orbstack/bin)
+  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+  cargo:rerun-if-env-changed=CC_ENABLE_DEBUG_OUTPUT
+  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+  CRATE_CC_NO_DEFAULTS = None
+  CFLAGS = None
+  TARGET_CFLAGS = None
+  CFLAGS_x86_64_unknown_linux_gnu = None
+  CFLAGS_x86_64-unknown-linux-gnu = None
+  cargo:warning=Assembler does not support flag: -Wa,--debug-prefix-map=/Users/danieliser/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.47.0=
+  CC_x86_64-unknown-linux-gnu = None
+  CC_x86_64_unknown_linux_gnu = None
+  TARGET_CC = None
+  CC = None
+  CROSS_COMPILE = None
+  PATH = Some(/Users/danieliser/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Users/danieliser/.local/bin:/opt/homebrew/Caskroom/codex/0.166.0/codex-path:/Users/danieliser/.codex/tmp/arg0-macos/codex-arg0Md3eqq:/Users/danieliser/.grok/bin:/Users/danieliser/.autovault/bin:/Users/danieliser/Toolkit/bin:/Users/danieliser/.antigravity/antigravity/bin:/Users/danieliser/.bun/bin:/Users/danieliser/.nvm/versions/node/v22.19.0/bin:/Users/danieliser/.pyenv/shims:/Users/danieliser/Toolkit/persistence/cli/bin:/Users/danieliser/.composer/vendor/bin:/Users/danieliser/bin:/opt/homebrew/opt/postgresql@16/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/danieliser/.cargo/bin:/Users/danieliser/.orbstack/bin:/Users/danieliser/.lmstudio/bin:/Users/danieliser/.orbstack/bin)
+  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+  CRATE_CC_NO_DEFAULTS = None
+  CFLAGS = None
+  TARGET_CFLAGS = None
+  CFLAGS_x86_64_unknown_linux_gnu = None
+  CFLAGS_x86_64-unknown-linux-gnu = None
+  CC_FORCE_DISABLE = None
+  CC_x86_64-unknown-linux-gnu = None
+  CC_x86_64_unknown_linux_gnu = None
+  TARGET_CC = None
+  CC = None
+  CROSS_COMPILE = None
+  PATH = Some(/Users/danieliser/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Users/danieliser/.local/bin:/opt/homebrew/Caskroom/codex/0.166.0/codex-path:/Users/danieliser/.codex/tmp/arg0-macos/codex-arg0Md3eqq:/Users/danieliser/.grok/bin:/Users/danieliser/.autovault/bin:/Users/danieliser/Toolkit/bin:/Users/danieliser/.antigravity/antigravity/bin:/Users/danieliser/.bun/bin:/Users/danieliser/.nvm/versions/node/v22.19.0/bin:/Users/danieliser/.pyenv/shims:/Users/danieliser/Toolkit/persistence/cli/bin:/Users/danieliser/.composer/vendor/bin:/Users/danieliser/bin:/opt/homebrew/opt/postgresql@16/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/danieliser/.cargo/bin:/Users/danieliser/.orbstack/bin:/Users/danieliser/.lmstudio/bin:/Users/danieliser/.orbstack/bin)
+  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+  CRATE_CC_NO_DEFAULTS = None
+  CFLAGS = None
+  TARGET_CFLAGS = None
+  CFLAGS_x86_64_unknown_linux_gnu = None
+  CFLAGS_x86_64-unknown-linux-gnu = None
+  cargo:warning=Compilation of 'stdalign_check.c' failed - Err(Error { kind: ToolNotFound, message: "failed to find tool \"x86_64-linux-gnu-gcc\": No such file or directory (os error 2)" }).
+  CC_x86_64-unknown-linux-gnu = None
+  CC_x86_64_unknown_linux_gnu = None
+  TARGET_CC = None
+  CC = None
+  CROSS_COMPILE = None
+  PATH = Some(/Users/danieliser/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Users/danieliser/.local/bin:/opt/homebrew/Caskroom/codex/0.166.0/codex-path:/Users/danieliser/.codex/tmp/arg0-macos/codex-arg0Md3eqq:/Users/danieliser/.grok/bin:/Users/danieliser/.autovault/bin:/Users/danieliser/Toolkit/bin:/Users/danieliser/.antigravity/antigravity/bin:/Users/danieliser/.bun/bin:/Users/danieliser/.nvm/versions/node/v22.19.0/bin:/Users/danieliser/.pyenv/shims:/Users/danieliser/Toolkit/persistence/cli/bin:/Users/danieliser/.composer/vendor/bin:/Users/danieliser/bin:/opt/homebrew/opt/postgresql@16/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/danieliser/.cargo/bin:/Users/danieliser/.orbstack/bin:/Users/danieliser/.lmstudio/bin:/Users/danieliser/.orbstack/bin)
+  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+  CRATE_CC_NO_DEFAULTS = None
+  CFLAGS = None
+  TARGET_CFLAGS = None
+  CFLAGS_x86_64_unknown_linux_gnu = None
+  CFLAGS_x86_64-unknown-linux-gnu = None
+  CC_FORCE_DISABLE = None
+  CC_x86_64-unknown-linux-gnu = None
+  CC_x86_64_unknown_linux_gnu = None
+  TARGET_CC = None
+  CC = None
+  CROSS_COMPILE = None
+  PATH = Some(/Users/danieliser/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Users/danieliser/.local/bin:/opt/homebrew/Caskroom/codex/0.166.0/codex-path:/Users/danieliser/.codex/tmp/arg0-macos/codex-arg0Md3eqq:/Users/danieliser/.grok/bin:/Users/danieliser/.autovault/bin:/Users/danieliser/Toolkit/bin:/Users/danieliser/.antigravity/antigravity/bin:/Users/danieliser/.bun/bin:/Users/danieliser/.nvm/versions/node/v22.19.0/bin:/Users/danieliser/.pyenv/shims:/Users/danieliser/Toolkit/persistence/cli/bin:/Users/danieliser/.composer/vendor/bin:/Users/danieliser/bin:/opt/homebrew/opt/postgresql@16/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/danieliser/.cargo/bin:/Users/danieliser/.orbstack/bin:/Users/danieliser/.lmstudio/bin:/Users/danieliser/.orbstack/bin)
+  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+  CRATE_CC_NO_DEFAULTS = None
+  CFLAGS = None
+  TARGET_CFLAGS = None
+  CFLAGS_x86_64_unknown_linux_gnu = None
+  CFLAGS_x86_64-unknown-linux-gnu = None
+  cargo:warning=Compilation of 'builtin_swap_check.c' failed - Err(Error { kind: ToolNotFound, message: "failed to find tool \"x86_64-linux-gnu-gcc\": No such file or directory (os error 2)" }).
+  CC_x86_64-unknown-linux-gnu = None
+  CC_x86_64_unknown_linux_gnu = None
+  TARGET_CC = None
+  CC = None
+  CROSS_COMPILE = None
+  PATH = Some(/Users/danieliser/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Users/danieliser/.local/bin:/opt/homebrew/Caskroom/codex/0.166.0/codex-path:/Users/danieliser/.codex/tmp/arg0-macos/codex-arg0Md3eqq:/Users/danieliser/.grok/bin:/Users/danieliser/.autovault/bin:/Users/danieliser/Toolkit/bin:/Users/danieliser/.antigravity/antigravity/bin:/Users/danieliser/.bun/bin:/Users/danieliser/.nvm/versions/node/v22.19.0/bin:/Users/danieliser/.pyenv/shims:/Users/danieliser/Toolkit/persistence/cli/bin:/Users/danieliser/.composer/vendor/bin:/Users/danieliser/bin:/opt/homebrew/opt/postgresql@16/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/danieliser/.cargo/bin:/Users/danieliser/.orbstack/bin:/Users/danieliser/.lmstudio/bin:/Users/danieliser/.orbstack/bin)
+  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+  CRATE_CC_NO_DEFAULTS = None
+  CFLAGS = None
+  TARGET_CFLAGS = None
+  CFLAGS_x86_64_unknown_linux_gnu = None
+  CFLAGS_x86_64-unknown-linux-gnu = None
+  CC_FORCE_DISABLE = None
+  CC_x86_64-unknown-linux-gnu = None
+  CC_x86_64_unknown_linux_gnu = None
+  TARGET_CC = None
+  CC = None
+  CROSS_COMPILE = None
+  PATH = Some(/Users/danieliser/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Users/danieliser/.local/bin:/opt/homebrew/Caskroom/codex/0.166.0/codex-path:/Users/danieliser/.codex/tmp/arg0-macos/codex-arg0Md3eqq:/Users/danieliser/.grok/bin:/Users/danieliser/.autovault/bin:/Users/danieliser/Toolkit/bin:/Users/danieliser/.antigravity/antigravity/bin:/Users/danieliser/.bun/bin:/Users/danieliser/.nvm/versions/node/v22.19.0/bin:/Users/danieliser/.pyenv/shims:/Users/danieliser/Toolkit/persistence/cli/bin:/Users/danieliser/.composer/vendor/bin:/Users/danieliser/bin:/opt/homebrew/opt/postgresql@16/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/danieliser/.cargo/bin:/Users/danieliser/.orbstack/bin:/Users/danieliser/.lmstudio/bin:/Users/danieliser/.orbstack/bin)
+  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+  CRATE_CC_NO_DEFAULTS = None
+  CFLAGS = None
+  TARGET_CFLAGS = None
+  CFLAGS_x86_64_unknown_linux_gnu = None
+  CFLAGS_x86_64-unknown-linux-gnu = None
+  cargo:warning=Compilation of 'linux_random_h.c' failed - Err(Error { kind: ToolNotFound, message: "failed to find tool \"x86_64-linux-gnu-gcc\": No such file or directory (os error 2)" }).
+  CC_x86_64-unknown-linux-gnu = None
+  CC_x86_64_unknown_linux_gnu = None
+  TARGET_CC = None
+  CC = None
+  CROSS_COMPILE = None
+  PATH = Some(/Users/danieliser/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Users/danieliser/.local/bin:/opt/homebrew/Caskroom/codex/0.166.0/codex-path:/Users/danieliser/.codex/tmp/arg0-macos/codex-arg0Md3eqq:/Users/danieliser/.grok/bin:/Users/danieliser/.autovault/bin:/Users/danieliser/Toolkit/bin:/Users/danieliser/.antigravity/antigravity/bin:/Users/danieliser/.bun/bin:/Users/danieliser/.nvm/versions/node/v22.19.0/bin:/Users/danieliser/.pyenv/shims:/Users/danieliser/Toolkit/persistence/cli/bin:/Users/danieliser/.composer/vendor/bin:/Users/danieliser/bin:/opt/homebrew/opt/postgresql@16/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/danieliser/.cargo/bin:/Users/danieliser/.orbstack/bin:/Users/danieliser/.lmstudio/bin:/Users/danieliser/.orbstack/bin)
+  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+  CRATE_CC_NO_DEFAULTS = None
+  CFLAGS = None
+  TARGET_CFLAGS = None
+  CFLAGS_x86_64_unknown_linux_gnu = None
+  CFLAGS_x86_64-unknown-linux-gnu = None
+  CC_FORCE_DISABLE = None
+  CC_x86_64-unknown-linux-gnu = None
+  CC_x86_64_unknown_linux_gnu = None
+  TARGET_CC = None
+  CC = None
+  CROSS_COMPILE = None
+  PATH = Some(/Users/danieliser/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Users/danieliser/.local/bin:/opt/homebrew/Caskroom/codex/0.166.0/codex-path:/Users/danieliser/.codex/tmp/arg0-macos/codex-arg0Md3eqq:/Users/danieliser/.grok/bin:/Users/danieliser/.autovault/bin:/Users/danieliser/Toolkit/bin:/Users/danieliser/.antigravity/antigravity/bin:/Users/danieliser/.bun/bin:/Users/danieliser/.nvm/versions/node/v22.19.0/bin:/Users/danieliser/.pyenv/shims:/Users/danieliser/Toolkit/persistence/cli/bin:/Users/danieliser/.composer/vendor/bin:/Users/danieliser/bin:/opt/homebrew/opt/postgresql@16/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/danieliser/.cargo/bin:/Users/danieliser/.orbstack/bin:/Users/danieliser/.lmstudio/bin:/Users/danieliser/.orbstack/bin)
+  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+  CRATE_CC_NO_DEFAULTS = None
+  CFLAGS = None
+  TARGET_CFLAGS = None
+  CFLAGS_x86_64_unknown_linux_gnu = None
+  CFLAGS_x86_64-unknown-linux-gnu = None
+  cargo:warning=Compilation of 'linux_random_h.c' failed - Err(Error { kind: ToolNotFound, message: "failed to find tool \"x86_64-linux-gnu-gcc\": No such file or directory (os error 2)" }).
+  CC_x86_64-unknown-linux-gnu = None
+  CC_x86_64_unknown_linux_gnu = None
+  TARGET_CC = None
+  CC = None
+  CROSS_COMPILE = None
+  PATH = Some(/Users/danieliser/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Users/danieliser/.local/bin:/opt/homebrew/Caskroom/codex/0.166.0/codex-path:/Users/danieliser/.codex/tmp/arg0-macos/codex-arg0Md3eqq:/Users/danieliser/.grok/bin:/Users/danieliser/.autovault/bin:/Users/danieliser/Toolkit/bin:/Users/danieliser/.antigravity/antigravity/bin:/Users/danieliser/.bun/bin:/Users/danieliser/.nvm/versions/node/v22.19.0/bin:/Users/danieliser/.pyenv/shims:/Users/danieliser/Toolkit/persistence/cli/bin:/Users/danieliser/.composer/vendor/bin:/Users/danieliser/bin:/opt/homebrew/opt/postgresql@16/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/danieliser/.cargo/bin:/Users/danieliser/.orbstack/bin:/Users/danieliser/.lmstudio/bin:/Users/danieliser/.orbstack/bin)
+  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+  CRATE_CC_NO_DEFAULTS = None
+  CFLAGS = None
+  TARGET_CFLAGS = None
+  CFLAGS_x86_64_unknown_linux_gnu = None
+  CFLAGS_x86_64-unknown-linux-gnu = None
+  CC_FORCE_DISABLE = None
+  CC_x86_64-unknown-linux-gnu = None
+  CC_x86_64_unknown_linux_gnu = None
+  TARGET_CC = None
+  CC = None
+  CROSS_COMPILE = None
+  PATH = Some(/Users/danieliser/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Users/danieliser/.local/bin:/opt/homebrew/Caskroom/codex/0.166.0/codex-path:/Users/danieliser/.codex/tmp/arg0-macos/codex-arg0Md3eqq:/Users/danieliser/.grok/bin:/Users/danieliser/.autovault/bin:/Users/danieliser/Toolkit/bin:/Users/danieliser/.antigravity/antigravity/bin:/Users/danieliser/.bun/bin:/Users/danieliser/.nvm/versions/node/v22.19.0/bin:/Users/danieliser/.pyenv/shims:/Users/danieliser/Toolkit/persistence/cli/bin:/Users/danieliser/.composer/vendor/bin:/Users/danieliser/bin:/opt/homebrew/opt/postgresql@16/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/danieliser/.cargo/bin:/Users/danieliser/.orbstack/bin:/Users/danieliser/.lmstudio/bin:/Users/danieliser/.orbstack/bin)
+  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+  CRATE_CC_NO_DEFAULTS = None
+  CFLAGS = None
+  TARGET_CFLAGS = None
+  CFLAGS_x86_64_unknown_linux_gnu = None
+  CFLAGS_x86_64-unknown-linux-gnu = None
+
+  --- stderr
+
+
+  error occurred in cc-rs: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+
+
+warning: build failed, waiting for other jobs to finish...
+warning: libsqlite3-sys@0.37.0: Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+error: failed to run custom build command for `libsqlite3-sys v0.37.0`
+
+Caused by:
+  process didn't exit successfully: `/Users/danieliser/Toolkit/capability-broker/rust/target/release/build/libsqlite3-sys-35ad4b7f2de5594c/build-script-build` (exit status: 1)
+  --- stdout
+  cargo:rerun-if-env-changed=LIBSQLITE3_SYS_USE_PKG_CONFIG
+  cargo:include=/Users/danieliser/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libsqlite3-sys-0.37.0/sqlite3
+  cargo:rerun-if-changed=sqlite3/sqlite3.c
+  cargo:rerun-if-changed=sqlite3/wasm32-wasi-vfs.c
+  cargo:rerun-if-env-changed=SQLITE_MAX_VARIABLE_NUMBER
+  cargo:rerun-if-env-changed=SQLITE_MAX_EXPR_DEPTH
+  cargo:rerun-if-env-changed=SQLITE_MAX_COLUMN
+  cargo:rerun-if-env-changed=LIBSQLITE3_FLAGS
+  cargo:rerun-if-env-changed=CC_FORCE_DISABLE
+  CC_FORCE_DISABLE = None
+  cargo:rerun-if-env-changed=CC_x86_64-unknown-linux-gnu
+  CC_x86_64-unknown-linux-gnu = None
+  cargo:rerun-if-env-changed=CC_x86_64_unknown_linux_gnu
+  CC_x86_64_unknown_linux_gnu = None
+  cargo:rerun-if-env-changed=TARGET_CC
+  TARGET_CC = None
+  cargo:rerun-if-env-changed=CC
+  CC = None
+  cargo:rerun-if-env-changed=CROSS_COMPILE
+  CROSS_COMPILE = None
+  PATH = Some(/Users/danieliser/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Users/danieliser/.local/bin:/opt/homebrew/Caskroom/codex/0.166.0/codex-path:/Users/danieliser/.codex/tmp/arg0-macos/codex-arg0Md3eqq:/Users/danieliser/.grok/bin:/Users/danieliser/.autovault/bin:/Users/danieliser/Toolkit/bin:/Users/danieliser/.antigravity/antigravity/bin:/Users/danieliser/.bun/bin:/Users/danieliser/.nvm/versions/node/v22.19.0/bin:/Users/danieliser/.pyenv/shims:/Users/danieliser/Toolkit/persistence/cli/bin:/Users/danieliser/.composer/vendor/bin:/Users/danieliser/bin:/opt/homebrew/opt/postgresql@16/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/danieliser/.cargo/bin:/Users/danieliser/.orbstack/bin:/Users/danieliser/.lmstudio/bin:/Users/danieliser/.orbstack/bin)
+  cargo:rerun-if-env-changed=CC_ENABLE_DEBUG_OUTPUT
+  cargo:warning=Compiler family detection failed due to error: ToolNotFound: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+  cargo:rerun-if-env-changed=CPATH
+  cargo:rerun-if-env-changed=C_INCLUDE_PATH
+  cargo:rerun-if-env-changed=CPLUS_INCLUDE_PATH
+  cargo:rerun-if-env-changed=OBJC_INCLUDE_PATH
+  cargo:rerun-if-env-changed=OBJCPLUS_INCLUDE_PATH
+  cargo:rerun-if-env-changed=COMPILER_PATH
+  cargo:rerun-if-env-changed=SOURCE_DATE_EPOCH
+  cargo:rerun-if-env-changed=GCC_EXEC_PREFIX
+  cargo:rerun-if-env-changed=DEVELOPER_DIR
+  cargo:rerun-if-env-changed=TOOLCHAINS
+  cargo:rerun-if-env-changed=SDKROOT
+  cargo:rerun-if-env-changed=CRATE_CC_NO_DEFAULTS
+  CRATE_CC_NO_DEFAULTS = None
+  cargo:rerun-if-env-changed=CFLAGS
+  CFLAGS = None
+  cargo:rerun-if-env-changed=TARGET_CFLAGS
+  TARGET_CFLAGS = None
+  cargo:rerun-if-env-changed=CFLAGS_x86_64_unknown_linux_gnu
+  CFLAGS_x86_64_unknown_linux_gnu = None
+  cargo:rerun-if-env-changed=CFLAGS_x86_64-unknown-linux-gnu
+  CFLAGS_x86_64-unknown-linux-gnu = None
+
+  --- stderr
+
+
+  error occurred in cc-rs: failed to find tool "x86_64-linux-gnu-gcc": No such file or directory (os error 2)
+
+
