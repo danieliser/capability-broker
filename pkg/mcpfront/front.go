@@ -208,7 +208,7 @@ func (f *Front) serverFor(ctx context.Context, endpoint string, g *auth.Grant, e
 		if endpoint == AggregateEndpoint {
 			name = "broker"
 		}
-		ls = &liveServer{server: mcp.NewServer(&mcp.Implementation{Name: name, Version: "1"}, &mcp.ServerOptions{Logger: f.Logger,
+		ls = &liveServer{server: mcp.NewServer(&mcp.Implementation{Name: name, Version: "1"}, &mcp.ServerOptions{Logger: f.sdkLogger(),
 			Instructions: instructions,
 			// Declared up front: a server that starts with no tools (an aggregate whose connectors are all
 			// excluded, or still starting) must still tell the client it has tools and will announce changes.
@@ -485,6 +485,30 @@ type def struct {
 	connector, upstream string
 	tool                catalog.Tool
 }
+
+// sdkLogger passes the MCP SDK's warnings and errors through but not its per-request info lines (a session
+// connect and disconnect for every sessionless request).
+func (f *Front) sdkLogger() *slog.Logger {
+	if f.Logger == nil {
+		return nil
+	}
+	return slog.New(minLevel{f.Logger.Handler(), slog.LevelWarn})
+}
+
+type minLevel struct {
+	slog.Handler
+	min slog.Level
+}
+
+func (m minLevel) Enabled(ctx context.Context, l slog.Level) bool {
+	return l >= m.min && m.Handler.Enabled(ctx, l)
+}
+
+func (m minLevel) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return minLevel{m.Handler.WithAttrs(attrs), m.min}
+}
+
+func (m minLevel) WithGroup(name string) slog.Handler { return minLevel{m.Handler.WithGroup(name), m.min} }
 
 // SweepIdle drops cached servers nobody has used for maxIdle (a new request rebuilds one in milliseconds). Each
 // app, grant and option set gets its own server, and changed instructions create new ones, so without this the
