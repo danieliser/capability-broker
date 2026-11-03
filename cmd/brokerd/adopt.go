@@ -198,6 +198,16 @@ func runClientRestore(ctx context.Context, args []string) int {
 				continue
 			}
 			ok, err := c.unpark(path, name)
+			if err == nil && !ok && c.format == "toml" {
+				// Codex: per-server install replaces the parked table with the broker's entry, so the original lives
+				// only in the broker's record.
+				if rec := adopted[name]; rec != nil && rec.Entries[c.name] != nil {
+					var text string
+					if json.Unmarshal(rec.Entries[c.name], &text) == nil && text != "" {
+						ok, err = reinsertCodex(path, name, text)
+					}
+				}
+			}
 			if err == nil && !ok && c.format == "json" {
 				// Some clients (Claude Desktop) rewrite their config and drop unknown keys, taking the in-file
 				// backup with them; the broker's own record still has the original entry.
@@ -593,6 +603,30 @@ func unparkJSON(key string, inPlace bool) func(path, name string) (bool, error) 
 		}
 		return true, writeIfUnchanged(path, before, doc)
 	}
+}
+
+// reinsertCodex replaces the broker's [mcp_servers.<name>] table (and its sub-tables) with the original text,
+// enabled again. It leaves a non-broker table alone.
+func reinsertCodex(path, name, original string) (bool, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return false, err
+	}
+	var kept []string
+	for _, b := range splitTOML(string(raw)) {
+		if codexServer(b.header) == name {
+			if b.header == "[mcp_servers."+name+"]" && !strings.Contains(b.text, `url = "http://127.0.0.1:`) {
+				return false, nil // a real entry is already there
+			}
+			if b.header == "[mcp_servers."+name+"]" || !strings.HasPrefix(b.header, "[mcp_servers."+name+".tools.") {
+				continue // the broker's entry goes; original tool approvals (sub-tables) stay
+			}
+		}
+		kept = append(kept, b.text)
+	}
+	text := enabledLine.ReplaceAllString(original, "enabled = true")
+	out := strings.TrimRight(strings.Join(kept, ""), "\n") + "\n\n" + strings.TrimRight(text, "\n") + "\n"
+	return true, atomicWrite(path, []byte(out))
 }
 
 // reinsertJSON puts an adopted entry back into a JSON client's server map, unless the client already has one.

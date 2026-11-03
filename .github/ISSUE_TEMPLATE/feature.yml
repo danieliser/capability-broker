@@ -1,0 +1,10 @@
+name: Feature
+description: Something brokerd should do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you are trying to do
+      description: The situation and the outcome you want; a proposed design is welcome but optional.
+    validations: { required: true }

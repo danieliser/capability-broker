@@ -174,16 +174,25 @@ var envRef = regexp.MustCompile(`\$\{env:([A-Za-z0-9_]+)\}`)
 // Load reads the file and resolves secret and env references. A missing file is
 // an empty connector set, not an error: the daemon then serves nothing but health.
 func Load(path string, secrets map[string]string) ([]*Spec, error) {
+	specs, _, err := LoadAll(path, secrets)
+	return specs, err
+}
+
+// LoadAll is Load plus the connectors it skipped and why (a missing secret, an invalid field). One bad
+// connector never stops the others: the broker serves the rest and reports the skipped ones in status.
+// Only an unreadable or unparseable file is an error.
+func LoadAll(path string, secrets map[string]string) ([]*Spec, map[string]string, error) {
+	issues := map[string]string{}
 	raw, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		return nil, nil
+		return nil, issues, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("read %s: %w", path, err)
+		return nil, issues, fmt.Errorf("read %s: %w", path, err)
 	}
 	var f File
 	if err := yaml.Unmarshal(raw, &f); err != nil {
-		return nil, fmt.Errorf("parse %s: %w", path, err)
+		return nil, issues, fmt.Errorf("parse %s: %w", path, err)
 	}
 	var out []*Spec
 	for name, spec := range f.Connectors {
@@ -191,19 +200,23 @@ func Load(path string, secrets map[string]string) ([]*Spec, error) {
 			continue
 		}
 		if !nameRe.MatchString(name) || name == "persist" {
-			return nil, fmt.Errorf("%s: connector name %q is invalid", path, name)
+			issues[name] = fmt.Errorf("%s: connector name %q is invalid", path, name).Error()
+			continue
 		}
 		if spec.Disabled {
 			continue
 		}
 		if spec.Expose != "" && spec.Expose != "passthrough" && spec.Expose != "broker" {
-			return nil, fmt.Errorf("%s: connector %s expose must be passthrough or broker", path, name)
+			issues[name] = fmt.Errorf("%s: connector %s expose must be passthrough or broker", path, name).Error()
+			continue
 		}
 		if (strings.TrimSpace(spec.Command) == "") == (strings.TrimSpace(spec.URL) == "") {
-			return nil, fmt.Errorf("%s: connector %s needs exactly one of command or url", path, name)
+			issues[name] = fmt.Errorf("%s: connector %s needs exactly one of command or url", path, name).Error()
+			continue
 		}
 		if spec.URL != "" && !strings.HasPrefix(spec.URL, "https://") && !strings.HasPrefix(spec.URL, "http://127.0.0.1") && !strings.HasPrefix(spec.URL, "http://localhost") {
-			return nil, fmt.Errorf("%s: connector %s url must be https (plain http only on loopback)", path, name)
+			issues[name] = fmt.Errorf("%s: connector %s url must be https (plain http only on loopback)", path, name).Error()
+			continue
 		}
 		spec.Name = name
 		spec.NoPin = spec.Pin != nil && !*spec.Pin
@@ -222,21 +235,24 @@ func Load(path string, secrets map[string]string) ([]*Spec, error) {
 		}
 		var err error
 		if spec.Env, err = resolveMap(spec.Env, secrets, path, name, "env"); err != nil {
-			return nil, err
+			issues[name] = err.Error()
+			continue
 		}
 		if spec.Headers, err = resolveMap(spec.Headers, secrets, path, name, "header"); err != nil {
-			return nil, err
+			issues[name] = err.Error()
+			continue
 		}
 		if spec.OAuth != nil && spec.OAuth.ClientSecret != "" {
 			m, err := resolveMap(map[string]string{"client_secret": spec.OAuth.ClientSecret}, secrets, path, name, "oauth")
 			if err != nil {
-				return nil, err
+				issues[name] = err.Error()
+				continue
 			}
 			spec.OAuth.ClientSecret = m["client_secret"]
 		}
 		out = append(out, spec)
 	}
-	return out, nil
+	return out, issues, nil
 }
 
 // resolveMap substitutes ${secret:x} and ${env:X} in every value.

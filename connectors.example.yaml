@@ -1,66 +1,67 @@
-# brokerd connectors: every stdio MCP server the broker hosts. Copy to ~/.brokerd/connectors.yaml.
+# ~/.brokerd/connectors.yaml: every MCP server the broker runs. Hot-reloaded within 2 seconds.
 #
-# Tools are discovered from each child at startup and exported verbatim at /mcp/<name>.
-# Policy comes from the connector's catalog: ~/.brokerd/catalog.d/<name>.yaml if present, otherwise the
-# catalog embedded in brokerd for that name (clickhouse, wp-mcp-router, memory), otherwise a synthesized
-# one in which every tool is an operation of its own name that an agent grant must list under `operations`.
-# Env values may reference ${secret:key} (from ~/.brokerd/secrets.json) and ${env:NAME}; the child never
-# sees anything else from the broker's environment.
-connectors:
-  clickhouse:
-    command: uvx
-    args: [--from, mcp-clickhouse, mcp-clickhouse]
-    env:
-      CLICKHOUSE_HOST: localhost
-      CLICKHOUSE_PORT: "18123"
-      CLICKHOUSE_USER: broker_reader
-      CLICKHOUSE_PASSWORD: "${secret:clickhouse_password}"
-      CLICKHOUSE_DATABASE: companykit
-      CLICKHOUSE_SECURE: "false"
-      CLICKHOUSE_VERIFY: "false"
-    startup_timeout: 120s
-  memory:
-    command: ~/.local/share/mcp-clients/node_modules/.bin/mcp-automem
-    env:
-      AUTOMEM_API_URL: https://memory-service.up.railway.app
-      AUTOMEM_API_KEY: "${secret:automem_api_key}"
-  wp-mcp-router:
-    command: npx
-    args: [-y, wp-mcp-router@latest]
-    env:
-      WP_MCP_ROUTER_CONFIG: ~/.config/wp-mcp-router/sites.json
-    startup_timeout: 120s
-  # A remote server with header credentials.
-  # cloudways:
-  #   url: https://mcp.cloudways.com/mcp/
-  #   headers:
-  #     X-CW-Api-Key: "${secret:CLOUDWAYS_API_KEY}"
-  # A remote server the broker signs in to (run `brokerd auth vercel` once).
-  # vercel:
-  #   url: https://mcp.vercel.com/
-  #   oauth: {}
-  # Scopes can be fixed instead of discovered:
-  # sofa:
-  #   url: https://agents.stackoverflow.com/mcp
-  #   oauth:
-  #     scopes: [sofa.read, sofa.identity.read]
-  # Owner-only: never granted to agents.
-  # gmail-work:
-  #   command: gog
-  #   args: [--account, work, --readonly, --gmail-no-send, mcp, --allow-tool, gmail]
-  #   owner_only: true
-  # Shaping, per connector (all optional):
-  # metabase:
-  #   command: uv
-  #   args: [--directory, /path/to/metabase-mcp, run, src/metabase_mcp_server.py]
-  #   expose: broker                 # not preloaded: found via search_tools / describe_tool / call_tool
-  #   clients: [claude-code, codex]  # or [!cursor]
-  #   tools:
-  #     exclude: ["delete_*"]        # globs; hidden and refused for every caller
-  #   strip: [outputSchema, meta]
-  #   response:
-  #     drop_keys: [_links, debug]
-  #     compact: true
-  #     max_chars: 20000
-  #     command: [jq, -c, "."]       # external filter: result JSON in, result JSON or text out
-  #     tools: ["get_*"]             # limit the response filter to these tools
+# Quickest start: let the broker move in the servers your apps already have:
+#   brokerd client adopt <server> --dry-run      # see the definition first
+#   brokerd client adopt <server>
+#
+# Or add servers by hand below. Keys go in ~/.brokerd/secrets.json (`brokerd secret set NAME`) and are referenced
+# as ${secret:NAME}; ${env:NAME} reads the broker's environment. A server whose secret is missing is skipped and
+# shown in `brokerd status`; the others keep running.
+#
+# Tools are discovered from each server and passed through unchanged. For agents, policy comes from the
+# connector's catalog (~/.brokerd/catalog.d/<name>.yaml, an embedded one, or a synthesized one in which every tool
+# is an operation of its own name that an agent grant must list).
+
+connectors: {}
+
+# Examples (uncomment under `connectors:` and remove the `{}`):
+#
+# connectors:
+#   # A local server run by npx or uvx (pinned to one installed version automatically).
+#   github:
+#     command: npx
+#     args: [-y, "@modelcontextprotocol/server-github"]
+#     env:
+#       GITHUB_PERSONAL_ACCESS_TOKEN: "${secret:GITHUB_TOKEN}"
+#
+#   # A database, read-only, started only when a call needs it.
+#   clickhouse:
+#     command: uvx
+#     args: [--from, mcp-clickhouse, mcp-clickhouse]
+#     env:
+#       CLICKHOUSE_HOST: localhost
+#       CLICKHOUSE_USER: readonly
+#       CLICKHOUSE_PASSWORD: "${secret:CLICKHOUSE_PASSWORD}"
+#       CLICKHOUSE_DATABASE: analytics
+#     on_demand: true              # not started until called; tools listed from cache
+#     idle_stop: 10m               # stopped again after 10 quiet minutes
+#
+#   # A remote server with an API key header.
+#   hosting:
+#     url: https://mcp.example-host.com/mcp/
+#     headers:
+#       X-Api-Key: "${secret:HOSTING_API_KEY}"
+#
+#   # A remote server the broker signs in to with OAuth (run `brokerd auth vercel` once).
+#   vercel:
+#     url: https://mcp.vercel.com/
+#     oauth: {}
+#
+#   # Personal data: your own apps only, never granted to agents.
+#   gmail-work:
+#     command: gog
+#     args: [--account, work, --readonly, mcp, --allow-tool, gmail]
+#     owner_only: true
+#
+#   # A big tool list kept out of every chat's context: found through search_tools / call_tool when needed.
+#   metabase:
+#     command: uv
+#     args: [--directory, ~/mcp/metabase, run, server.py]
+#     expose: broker
+#     clients: [claude-code, codex]        # only these apps (or [!cursor] to leave one out)
+#     tools: { exclude: ["delete_*"] }     # hidden and refused for every caller
+#     strip: [outputSchema, meta]          # parts of tool definitions or results apps do not need
+#     response:                            # reshape results for every caller
+#       drop_keys: [_links, debug]
+#       max_chars: 20000
+#       command: [jq, -c, "."]             # an external filter: result JSON in, result JSON or text out

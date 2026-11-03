@@ -172,7 +172,7 @@ func run(cfg config.Config, stateless bool) error {
 
 	frontSrv := &http.Server{Addr: cfg.FrontAddr(), Handler: api.FrontHandler(front, oauthMgr.Callback), ReadHeaderTimeout: 10 * time.Second}
 	admin := &api.Admin{Token: adminToken, Store: store, Catalog: cat, Audit: writer, Front: front, Registry: reg, DB: db,
-		FrontURL: "http://" + cfg.FrontAddr(), Started: time.Now(), OAuth: oauthMgr, Reconnect: reloader.Reconnect,
+		FrontURL: "http://" + cfg.FrontAddr(), Started: time.Now(), OAuth: oauthMgr, Reconnect: reloader.Reconnect, Issues: reloader.Issues,
 		Reload: func(ctx context.Context) (map[string]any, error) {
 			res, err := reloader.Apply(ctx)
 			if err != nil {

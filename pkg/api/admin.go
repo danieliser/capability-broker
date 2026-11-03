@@ -42,6 +42,8 @@ type Admin struct {
 	// OAuth and Reconnect drive `brokerd auth`: sign a url connector in, then start it again.
 	OAuth     *remoteauth.Manager
 	Reconnect func(name string) error
+	// Issues lists connectors skipped by the last config load (missing secret, invalid field).
+	Issues func() map[string]string
 }
 
 // specOf returns the connector definition behind a registered adapter.
@@ -118,6 +120,11 @@ func (a *Admin) status(w http.ResponseWriter, r *http.Request) {
 			health[name] = "ok"
 		}
 		cancel()
+	}
+	if a.Issues != nil {
+		for name, why := range a.Issues() {
+			health[name] = "not loaded: " + why
+		}
 	}
 	live, _ := a.Store.List(r.Context(), true)
 	n, _ := a.Audit.Count(r.Context())

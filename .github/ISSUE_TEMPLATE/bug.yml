@@ -1,0 +1,25 @@
+name: Bug
+description: Something does not work, or an app sees an MCP server differently through the broker
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+    validations: { required: true }
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The connector block from connectors.yaml (remove secrets), the app, and the call you made.
+  - type: textarea
+    id: status
+    attributes:
+      label: brokerd status and version
+      description: Output of `brokerd --version` and `brokerd status`, and relevant log lines (macOS ~/Library/Logs/capability-broker/brokerd.log, Linux `journalctl --user -u brokerd`). Remove secrets.
+      render: text
+  - type: input
+    id: platform
+    attributes:
+      label: OS and apps
+      placeholder: macOS 26 arm64; Claude Code 2.1, Codex 0.16

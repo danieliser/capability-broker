@@ -34,20 +34,27 @@ headless get the same keys you do.
 | Latency added per tool call | ≈ 0.6 ms |
 | Tool definitions loaded per chat, 304 tools | 1.05 MB → 1.6 KB on demand |
 
-Methods and caveats in [docs/benchmarks.md](docs/benchmarks.md). macOS today (launchd); the daemon is plain Go.
+Methods and caveats in [docs/benchmarks.md](docs/benchmarks.md).
 
 ## Install
 
+macOS and Linux (amd64, arm64). The installer downloads the release binary for your machine, checks it against
+the release's `SHA256SUMS`, and runs it as a user service (launchd on macOS, `systemd --user` on Linux):
+
 ```sh
-git clone https://github.com/danieliser/capability-broker ~/Toolkit/capability-broker
-cd ~/Toolkit/capability-broker
-./install.sh            # builds with a stamped identity, installs ~/.local/bin/brokerd, loads launchd
+curl -fsSLO https://raw.githubusercontent.com/danieliser/capability-broker/main/install.sh
+less install.sh          # read it first
+bash install.sh
 brokerd status
 ```
 
-Keys live in `~/.brokerd/secrets.json` (0600) and are referenced as `${secret:NAME}`; the installer seeds
-`~/.brokerd/connectors.yaml` from `connectors.example.yaml`. Settings: `BROKERD_PORT`, `BROKERD_HOST` (loopback
-only), `BROKERD_DATA_DIR`.
+From a clone with Go installed, `./install.sh` builds from source instead. `--no-service` installs the binary only
+(containers, CI, other init systems; then run `brokerd` yourself). On Linux, `loginctl enable-linger $USER` keeps
+it running after you log out. Settings: `BIN_DIR`, `BROKERD_DATA_DIR`, `BROKERD_PORT`, `BROKERD_VERSION`.
+
+Keys go in `~/.brokerd/secrets.json` (0600) with `brokerd secret set NAME` (the value is read from stdin) and are
+referenced as `${secret:NAME}`. Servers go in `~/.brokerd/connectors.yaml`, which starts empty with commented
+examples.
 
 ## Move your existing servers in
 
@@ -98,7 +105,7 @@ A control plane (PERSIST, here) mints a grant per agent run over the admin socke
 ```json
 {
   "clickhouse": { "queries": ["scheduler.freshness"], "limits": { "max_rows": 2000 } },
-  "wp-mcp-router": { "sites": ["wppopupmaker"], "operations": ["content.read", "content.draft"] },
+  "wp-mcp-router": { "sites": ["my-blog"], "operations": ["content.read", "content.draft"] },
   "memory": { "namespaces": ["agent:my.agent"], "operations": ["recall", "store"] }
 }
 ```
@@ -126,6 +133,22 @@ brokerd-probe -raw -url http://127.0.0.1:8890/mcp/<connector> -token "$TOKEN" [-
 `broker` entry that carries servers added mid-chat and on-demand servers; `single` gives one `broker` entry with
 every tool (what agents use; measured equal for low-effort models in [docs/eval.md](docs/eval.md)). Installed apps
 are managed: when a server is added or removed, the daemon updates their configs.
+
+## Status and limits
+
+Used daily on the author's machine since November 2026 with Claude Code, Codex, Cursor, OpenCode, Claude Desktop
+and a fleet of headless agents. Things to know:
+
+- **Platforms:** macOS and Linux. No Windows build yet.
+- **Apps:** Claude Code, Codex, Cursor, OpenCode and Claude Desktop are configured automatically; any MCP client
+  that speaks Streamable HTTP can use the broker with a token from `brokerd client mint --name <app>`.
+- **On-demand servers (`expose: broker`)** are reached through `call_tool`, which your apps' per-tool permission
+  rules cannot see into; use `tools.exclude` for hard limits. See [SECURITY.md](SECURITY.md).
+- **Server-to-client requests** (sampling, elicitation) are relayed only with `--stateless=false`; the default
+  sessionless mode has no channel for them.
+- **Prompts and resources** reach your own apps, not agents (agent grants cover tools).
+- **Mid-chat tool changes** reach Claude Code immediately; other apps pick them up when they refresh their tool
+  list, at the latest in the next chat.
 
 ## Layout
 
