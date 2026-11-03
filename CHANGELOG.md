@@ -4,6 +4,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+- Declarative per-operation argument rules (`allowlist`, `prefix`, `maximum`, `row_limit`, `max_per_day`) run after request enrichment and before the intent receipt. Grants can narrow connector values with `operation_constraints`; child grants retain parent restrictions. Every embedded operation declares a configurable daily budget, persisted by agent/project/operation and UTC date across grants and restarts.
+- The upstream adapter now enforces effective result row ceilings (including verbose responses) and broker call deadlines. WordPress fan-out is restricted to grant sites; memory updates retain namespace tags and importance bounds. Provider scan/spend limits remain provider-side settings.
+- Isolated steward acceptance: named query read, memory store through the broker memory front, scoped recall, effective argument digests, three persisted intent/outcome pairs and two denial receipts.
+- `brokerd-memory-cleanup`: exact paginated smoke inventory and reviewed-ID cleanup, read-only by default; execution requires a manifest and explicit flag, revalidates namespace/content, and verifies removal. Includes the 2026-11-03 one-memory live read inventory; no live deletion performed. Full operation map and Apex runbook in `docs/operation-constraints.md`.
+
 ## [0.11.0] - 2026-11-03
 
 - Install without Go: `install.sh` downloads the release binary for your OS and CPU and verifies it against the release's `SHA256SUMS` (default outside a clone, or `--binary`). Linux runs it as a `systemd --user` service; `--no-service` installs the binary only. The service's PATH is the one you installed from, so npx, uvx, node and python resolve as in your shell.

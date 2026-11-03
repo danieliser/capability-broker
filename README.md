@@ -113,6 +113,10 @@ A control plane (PERSIST, here) mints a grant per agent run over the admin socke
 The agent sees one `broker` server with only those tools, arguments narrowed to what it may use, responses trimmed
 for its context, and a receipt row before and after every call. The grant dies with the session.
 
+[Operation constraints and acceptance](docs/operation-constraints.md) maps all embedded operations, documents
+post-enrichment declarative rules and persistent daily budgets, and provides an isolated steward acceptance
+test plus a dry-run-first smoke-memory cleanup command.
+
 ## Commands
 
 ```sh

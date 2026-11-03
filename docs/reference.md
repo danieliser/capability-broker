@@ -62,3 +62,9 @@ The full behaviour, feature by feature. Start with the [README](../README.md).
   hypermedia keys dropped, JSON-in-string documents opened) unless the operation declares explicit fields;
   `verbose: true` returns the upstream payload untouched.
 
+
+## Operation constraints and acceptance
+
+See [the operation map and runbook](operation-constraints.md) for all 17 embedded operations, declarative
+argument rules, operation-specific grant values, daily counter semantics, row/deadline limits, the isolated
+steward acceptance test, and exact smoke-memory cleanup (read-only by default).
