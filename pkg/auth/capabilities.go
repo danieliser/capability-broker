@@ -181,9 +181,11 @@ func intersectConstraints(child, parent map[string]any) map[string]any {
 			}
 		} else if ps, ok := p.(string); ok {
 			cs, valid := c.(string)
-			if valid && strings.HasPrefix(cs, ps) {
+			if ps == "" || !valid || cs == "" {
+				out[k] = nil
+			} else if strings.HasPrefix(cs, ps) {
 				out[k] = cs
-			} else if valid && strings.HasPrefix(ps, cs) {
+			} else if strings.HasPrefix(ps, cs) {
 				out[k] = ps
 			} else {
 				out[k] = nil
