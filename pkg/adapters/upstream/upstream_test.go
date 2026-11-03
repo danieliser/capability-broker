@@ -86,7 +86,18 @@ func run(t *testing.T, a *Adapter, cat *catalog.Catalog, g *auth.Grant, tool str
 	if err != nil || !d.Allow {
 		t.Fatalf("policy: %v %+v", err, d)
 	}
-	return a.Execute(context.Background(), adapter.Call{Grant: g, Op: op, Tool: tool, Decision: d, Verbose: verbose, CallID: "c1"})
+	call, err := a.Prepare(context.Background(), adapter.Call{Grant: g, Op: op, Tool: tool, Decision: d, Verbose: verbose, CallID: "c1"})
+	if err != nil {
+		return nil, err
+	}
+	call.Decision, err = policy.EvaluateArguments(context.Background(), g, a.Connector(), op, call.Decision, policy.Env{Catalog: cat}, noCounters{})
+	if err != nil {
+		return nil, err
+	}
+	if !call.Decision.Allow {
+		return nil, adapter.Denied(call.Decision.Reason)
+	}
+	return a.Execute(context.Background(), call)
 }
 
 type noCounters struct{}
@@ -125,7 +136,8 @@ func TestClickHouseNamedQueryRewrittenForTheChild(t *testing.T) {
 	if len(tools) != 3 {
 		t.Fatalf("owner tools %d", len(tools))
 	}
-	if _, err := run(t, a, cat, owner, "run_query", map[string]any{"query": "SELECT 1; DROP TABLE x"}, false); err == nil {
+	sqlAgent := agent(auth.Capabilities{"clickhouse": {SQL: "select"}})
+	if _, err := run(t, a, cat, sqlAgent, "run_query", map[string]any{"query": "SELECT 1; DROP TABLE x"}, false); err == nil {
 		t.Fatal("multi-statement accepted")
 	}
 }
@@ -293,5 +305,42 @@ func TestRelayAttributesProgressAndSoleCaller(t *testing.T) {
 	r.end("c2")
 	if r.byToken("c1") != nil {
 		t.Fatal("ended call still registered")
+	}
+}
+
+func TestFinalConstraintsSeeForcedDraftStatus(t *testing.T) {
+	actionCalls := 0
+	child := &fakeChild{reply: func(string, map[string]any) any { actionCalls++; return map[string]any{"ok": true} }}
+	a, cat := adapterWith(t, "wp-mcp-router", child, "wp_run")
+	conn, _ := cat.Connector("wp-mcp-router")
+	op, ok := conn.Resolve("wp_run", map[string]any{"ability_name": "core/create-post"})
+	if !ok {
+		t.Fatal("no operation")
+	}
+	op.ArgumentConstraints = append(op.ArgumentConstraints, catalog.ArgumentConstraint{Kind: "allowlist", Path: "arguments.status", Key: "statuses", Required: true})
+	g := agent(auth.Capabilities{"wp-mcp-router": {Sites: []string{"a"}, Operations: []string{"content.draft"}, Constraints: map[string]any{"post_types": []any{"post"}, "statuses": []any{"publish"}}}})
+	// The request satisfies the allowlist, but enrichment forces draft. The final pass must deny it.
+	_, err := run(t, a, cat, g, "wp_run", map[string]any{"site": "a", "ability_name": "core/create-post", "arguments": map[string]any{"status": "publish"}}, false)
+	if err == nil || actionCalls != 0 {
+		t.Fatalf("enriched call escaped constraint: err=%v upstreamCalls=%d", err, actionCalls)
+	}
+}
+
+func TestRowBoundAppliesToVerboseAndDeadline(t *testing.T) {
+	child := &fakeChild{reply: func(string, map[string]any) any { return map[string]any{"rows": []any{1, 2}} }}
+	a, cat := adapterWith(t, "clickhouse", child, "run_query")
+	g := agent(auth.Capabilities{"clickhouse": {SQL: "select", Limits: map[string]float64{"max_rows": 1}}})
+	for _, verbose := range []bool{true, false} {
+		if _, err := run(t, a, cat, g, "run_query", map[string]any{"query": "SELECT 1"}, verbose); err == nil {
+			t.Fatal("oversized rows reached client")
+		}
+	}
+	child.reply = func(string, map[string]any) any {
+		time.Sleep(50 * time.Millisecond)
+		return map[string]any{"rows": []any{1}}
+	}
+	g.Capabilities["clickhouse"] = auth.ConnectorCapability{SQL: "select", Limits: map[string]float64{"max_execution_seconds": 0.005}}
+	if _, err := run(t, a, cat, g, "run_query", map[string]any{"query": "SELECT 1"}, false); err == nil {
+		t.Fatal("broker deadline was not applied")
 	}
 }

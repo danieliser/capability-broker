@@ -4,19 +4,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 )
 
 // ConnectorCapability is what a grant may do on one connector. Lists are allowlists;
 // an absent list means "nothing of that kind" for agent grants. Limits and
 // Constraints are keyed by the names the policy engine knows (see pkg/policy).
 type ConnectorCapability struct {
-	Operations  []string           `json:"operations,omitempty"`
-	Queries     []string           `json:"queries,omitempty"`
-	Sites       []string           `json:"sites,omitempty"`
-	Namespaces  []string           `json:"namespaces,omitempty"`
-	SQL         string             `json:"sql,omitempty"` // "select" grants raw SELECT on clickhouse
-	Limits      map[string]float64 `json:"limits,omitempty"`
-	Constraints map[string]any     `json:"constraints,omitempty"`
+	Operations           []string                  `json:"operations,omitempty"`
+	Queries              []string                  `json:"queries,omitempty"`
+	Sites                []string                  `json:"sites,omitempty"`
+	Namespaces           []string                  `json:"namespaces,omitempty"`
+	SQL                  string                    `json:"sql,omitempty"` // "select" grants raw SELECT on clickhouse
+	Limits               map[string]float64        `json:"limits,omitempty"`
+	Constraints          map[string]any            `json:"constraints,omitempty"`
+	OperationConstraints map[string]map[string]any `json:"operation_constraints,omitempty"`
 }
 
 // Capabilities maps connector id to its capability. The owner profile is the
@@ -98,13 +100,14 @@ func (c Capabilities) Intersect(parent Capabilities) Capabilities {
 			continue
 		}
 		out[name] = ConnectorCapability{
-			Operations:  intersectList(child.Operations, p.Operations),
-			Queries:     intersectList(child.Queries, p.Queries),
-			Sites:       intersectList(child.Sites, p.Sites),
-			Namespaces:  intersectList(child.Namespaces, p.Namespaces),
-			SQL:         minSQL(child.SQL, p.SQL),
-			Limits:      minLimits(child.Limits, p.Limits),
-			Constraints: child.Constraints,
+			Operations:           intersectList(child.Operations, p.Operations),
+			Queries:              intersectList(child.Queries, p.Queries),
+			Sites:                intersectList(child.Sites, p.Sites),
+			Namespaces:           intersectList(child.Namespaces, p.Namespaces),
+			SQL:                  minSQL(child.SQL, p.SQL),
+			Limits:               minLimits(child.Limits, p.Limits),
+			Constraints:          intersectConstraints(child.Constraints, p.Constraints),
+			OperationConstraints: intersectOperationConstraints(child.OperationConstraints, p.OperationConstraints),
 		}
 	}
 	return out
@@ -142,4 +145,92 @@ func minLimits(a, b map[string]float64) map[string]float64 {
 		}
 	}
 	return out
+}
+
+// Retain parent restrictions when a child omits them. Lists intersect, numeric ceilings
+// take the minimum, and compatible string prefixes take the narrower prefix. An
+// incompatible value becomes null, which declarative checks deny rather than ignore.
+func intersectConstraints(child, parent map[string]any) map[string]any {
+	out := map[string]any{}
+	for k, v := range child {
+		out[k] = v
+	}
+	for k, p := range parent {
+		c, exists := child[k]
+		if !exists {
+			out[k] = p
+			continue
+		}
+		if pl, ok := constraintStrings(p); ok {
+			cl, valid := constraintStrings(c)
+			if valid {
+				out[k] = intersectList(cl, pl)
+			} else {
+				out[k] = nil
+			}
+		} else if pn, ok := constraintNumber(p); ok {
+			cn, valid := constraintNumber(c)
+			if valid {
+				if cn < pn {
+					out[k] = cn
+				} else {
+					out[k] = pn
+				}
+			} else {
+				out[k] = nil
+			}
+		} else if ps, ok := p.(string); ok {
+			cs, valid := c.(string)
+			if ps == "" || !valid || cs == "" {
+				out[k] = nil
+			} else if strings.HasPrefix(cs, ps) {
+				out[k] = cs
+			} else if strings.HasPrefix(ps, cs) {
+				out[k] = ps
+			} else {
+				out[k] = nil
+			}
+		} else {
+			out[k] = nil
+		}
+	}
+	return out
+}
+func intersectOperationConstraints(child, parent map[string]map[string]any) map[string]map[string]any {
+	out := map[string]map[string]any{}
+	for op, v := range child {
+		out[op] = intersectConstraints(v, parent[op])
+	}
+	for op, v := range parent {
+		if _, ok := out[op]; !ok {
+			out[op] = intersectConstraints(nil, v)
+		}
+	}
+	return out
+}
+func constraintStrings(v any) ([]string, bool) {
+	switch v := v.(type) {
+	case []string:
+		return v, true
+	case []any:
+		out := make([]string, len(v))
+		for i, x := range v {
+			s, ok := x.(string)
+			if !ok {
+				return nil, false
+			}
+			out[i] = s
+		}
+		return out, true
+	}
+	return nil, false
+}
+func constraintNumber(v any) (float64, bool) {
+	switch v := v.(type) {
+	case float64:
+		return v, true
+	case int:
+		return float64(v), true
+	}
+	return 0, false
 }

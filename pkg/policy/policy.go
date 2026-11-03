@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/danieliser/capability-broker/pkg/auth"
 	"github.com/danieliser/capability-broker/pkg/catalog"
@@ -37,6 +38,7 @@ type Counters interface {
 type Env struct {
 	Catalog   *catalog.Catalog
 	SiteHosts map[string]string // wp site id → hostname
+	Now       time.Time         // zero uses the current UTC time
 }
 
 type Decision struct {
@@ -60,11 +62,12 @@ func Evaluate(ctx context.Context, g *auth.Grant, connector string, op *catalog.
 		return deny(CodeDeniedConnector, fmt.Sprintf("grant does not reach connector %s", connector)), nil
 	}
 	owner := g.Capabilities.IsOwner()
-	args := map[string]any{}
-	for k, v := range in {
-		args[k] = v
-	}
+	args := CloneArgs(in)
 	d := Decision{Allow: true, Args: args, Limits: map[string]any{}}
+	// Owner calls use connector exposure controls, never agent argument policy.
+	if owner {
+		return d, nil
+	}
 
 	if op.RequiresCapability != "" && !owner {
 		switch {
@@ -113,7 +116,7 @@ func Evaluate(ctx context.Context, g *auth.Grant, connector string, op *catalog.
 		case "namespaces":
 			dd = checkNamespaces(&d, cap, owner, op)
 		case "max_importance":
-			clampImportance(&d, cap, owner)
+			dd = clampImportance(&d, cap, owner, op.Tool == "store_memory")
 		default:
 			return deny(CodeDeniedOperation, "catalog names an unknown constraint "+check), nil
 		}
@@ -214,10 +217,14 @@ func checkSitesFilter(d *Decision, cap auth.ConnectorCapability, owner bool) *De
 	if owner {
 		return nil
 	}
+	if len(cap.Sites) == 0 {
+		dd := deny(CodeDeniedArgument, "grant lists no sites")
+		return &dd
+	}
 	if raw, ok := d.Args["sites"]; ok && raw != nil {
 		list, ok := raw.([]any)
-		if !ok {
-			dd := deny(CodeDeniedArgument, "sites must be a list")
+		if !ok || len(list) == 0 {
+			dd := deny(CodeDeniedArgument, "sites must be a non-empty list")
 			return &dd
 		}
 		for _, s := range list {
@@ -292,10 +299,15 @@ func checkNamespaces(d *Decision, cap auth.ConnectorCapability, owner bool, op *
 	}
 	d.Limits["namespaces"] = cap.Namespaces
 	switch op.Tool {
-	case "store_memory":
+	case "store_memory", "update_memory":
+		if op.Tool == "update_memory" {
+			if _, supplied := d.Args["tags"]; !supplied {
+				return nil
+			}
+		}
 		tags := stringList(d.Args["tags"])
 		for _, t := range tags {
-			if strings.HasPrefix(t, "agent:") || strings.HasPrefix(t, "project:") {
+			if strings.HasPrefix(strings.ToLower(t), "agent:") || strings.HasPrefix(strings.ToLower(t), "project:") {
 				if !contains(cap.Namespaces, t) {
 					dd := deny(CodeDeniedArgument, fmt.Sprintf("tag %s is outside the grant's namespaces", t))
 					return &dd
@@ -314,7 +326,7 @@ func checkNamespaces(d *Decision, cap auth.ConnectorCapability, owner bool, op *
 		tags := stringList(d.Args["tags"])
 		var scoped []any
 		for _, t := range tags {
-			if strings.HasPrefix(t, "agent:") || strings.HasPrefix(t, "project:") {
+			if strings.HasPrefix(strings.ToLower(t), "agent:") || strings.HasPrefix(strings.ToLower(t), "project:") {
 				if !contains(cap.Namespaces, t) {
 					dd := deny(CodeDeniedArgument, fmt.Sprintf("tag %s is outside the grant's namespaces", t))
 					return &dd
@@ -332,17 +344,32 @@ func checkNamespaces(d *Decision, cap auth.ConnectorCapability, owner bool, op *
 	return nil
 }
 
-func clampImportance(d *Decision, cap auth.ConnectorCapability, owner bool) {
+func clampImportance(d *Decision, cap auth.ConnectorCapability, owner, storing bool) *Decision {
 	if owner {
-		return
+		return nil
 	}
-	max, ok := cap.Constraints["max_importance"].(float64)
-	if !ok || max <= 0 {
-		return
+	raw, exists := cap.Constraints["max_importance"]
+	if !exists {
+		return nil
 	}
-	if v, ok := d.Args["importance"].(float64); ok && v > max {
+	max, ok := finiteNumber(raw)
+	if !ok || max < 0 || max > 1 {
+		dd := deny(CodeDeniedArgument, "max_importance must be between 0 and 1")
+		return &dd
+	}
+	if v, supplied := d.Args["importance"]; supplied {
+		n, valid := finiteNumber(v)
+		if !valid || n < 0 || n > 1 {
+			dd := deny(CodeDeniedArgument, "importance must be between 0 and 1")
+			return &dd
+		}
+		if n > max {
+			d.Args["importance"] = max
+		}
+	} else if storing && max < 0.5 {
 		d.Args["importance"] = max
 	}
+	return nil
 }
 
 func stringList(v any) []string {

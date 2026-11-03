@@ -625,16 +625,21 @@ func (f *Front) call(ctx context.Context, connector, tool string, req *mcp.CallT
 	conn, _ := f.Catalog.Connector(connector)
 	base := audit.Call{Grant: g, Connector: connector, Tool: tool, Args: args, PolicyVersion: f.Catalog.PolicyVersion(),
 		IdempotencyKey: idem, Verbose: verbose, RequestBytes: requestBytes}
-	if conn == nil || !conn.ToolExposed(tool) {
+	if conn == nil || conn.ToolDenied(tool) || (!g.Capabilities.IsOwner() && !conn.ToolExposed(tool)) {
 		f.Audit.Denied(ctx, base, policy.CodeDeniedOperation, "tool not exposed")
 		return toolError(policy.CodeDeniedOperation, fmt.Sprintf("tool %s is not available through this connector", tool)), nil
 	}
 	op, ok := conn.Resolve(tool, args)
+	if !ok && g.Capabilities.IsOwner() {
+		// The exposed upstream tool may accept actions outside the agent catalog.
+		op, ok = &catalog.Operation{ID: connector + "." + tool, Tool: tool, Risk: catalog.RiskSensitive}, true
+	}
 	if !ok {
 		f.Audit.Denied(ctx, base, policy.CodeDeniedOperation, "no operation matches these arguments")
 		return toolError(policy.CodeDeniedOperation, "this call does not map to a permitted operation (check the ability or query name)"), nil
 	}
 	base.Operation = op.ID
+	base.AdapterVersion = conn.AdapterVersion
 
 	env := policy.Env{Catalog: f.Catalog}
 	if src, ok := ad.(SiteHostSource); ok {
@@ -644,6 +649,27 @@ func (f *Front) call(ctx context.Context, connector, tool string, req *mcp.CallT
 	if err != nil {
 		f.Logger.Error("policy evaluation failed", "err", err.Error())
 		return toolError("BROKER_INTERNAL", "policy evaluation failed"), nil
+	}
+	if !decision.Allow {
+		f.Audit.Denied(ctx, base, decision.Code, decision.Reason)
+		return toolError(decision.Code, decision.Reason), nil
+	}
+	prepared := adapter.Call{Grant: g, Op: op, Tool: tool, Decision: decision, Verbose: verbose, IdempotencyKey: idem}
+	if p, ok := ad.(adapter.Preparer); ok {
+		prepared, err = p.Prepare(ctx, prepared)
+		if err != nil {
+			code, msg := policy.CodeDeniedArgument, "argument preparation failed"
+			if ue, ok := adapter.AsUpstream(err); ok {
+				code, msg = ue.Code, ue.Message
+			}
+			f.Audit.Denied(ctx, base, code, msg)
+			return toolError(code, msg), nil
+		}
+	}
+	decision, err = policy.EvaluateArguments(ctx, g, connector, op, prepared.Decision, env, f.Store)
+	if err != nil {
+		f.Audit.Denied(ctx, base, "BROKER_INTERNAL", "argument policy failed")
+		return toolError("BROKER_INTERNAL", "argument policy failed"), nil
 	}
 	if !decision.Allow {
 		f.Audit.Denied(ctx, base, decision.Code, decision.Reason)

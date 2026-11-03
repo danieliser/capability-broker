@@ -101,8 +101,8 @@ func TestOwnerProfile(t *testing.T) {
 	f := setup(t)
 	o := f.owner(t)
 	d := f.eval(t, o, "clickhouse", "run_query", map[string]any{"query": "SELECT 1"})
-	if !d.Allow || d.Limits["max_rows"].(float64) != DefaultMaxRows*10 {
-		t.Fatalf("owner sql denied or wrong limit: %+v", d)
+	if !d.Allow || len(d.Limits) != 0 {
+		t.Fatalf("owner sql denied or agent limits applied: %+v", d)
 	}
 	d = f.eval(t, o, "clickhouse", "run_query", map[string]any{"query": "@other.q"})
 	if !d.Allow {
@@ -205,5 +205,47 @@ func TestBlockMCPRefresherGrant(t *testing.T) {
 		if i == 0 && !d.Allow || i == 1 && (d.Allow || d.Code != CodeLimitExceeded) {
 			t.Fatalf("draft attempt %d: %+v", i+1, d)
 		}
+	}
+}
+
+func TestFanoutIsScopedAndEmptyListsDenied(t *testing.T) {
+	f := setup(t)
+	g := f.agent(t, auth.Capabilities{"wp-mcp-router": {Sites: []string{"a"}, Operations: []string{"run_across"}}})
+	d := f.eval(t, g, "wp-mcp-router", "wp_run_across", map[string]any{"ability_name": "core/get-post"})
+	if !d.Allow || len(d.Args["sites"].([]any)) != 1 || d.Args["sites"].([]any)[0] != "a" {
+		t.Fatalf("fanout not narrowed: %+v", d)
+	}
+	for _, sites := range []any{[]any{}, []any{"other"}, "a"} {
+		if d := f.eval(t, g, "wp-mcp-router", "wp_run_across", map[string]any{"sites": sites}); d.Allow {
+			t.Fatalf("bad fanout sites: %v", sites)
+		}
+	}
+	g = f.agent(t, auth.Capabilities{"wp-mcp-router": {Operations: []string{"run_across"}}})
+	if d := f.eval(t, g, "wp-mcp-router", "wp_run_across", nil); d.Allow {
+		t.Fatal("empty site grant admitted")
+	}
+}
+
+func TestMemoryUpdateTagsAndImportanceStayScoped(t *testing.T) {
+	f := setup(t)
+	g := f.agent(t, auth.Capabilities{"memory": {Namespaces: []string{"agent:me"}, Operations: []string{"update", "store"}, Constraints: map[string]any{"max_importance": 0.1}}})
+	d := f.eval(t, g, "memory", "update_memory", map[string]any{"memory_id": "m", "tags": []any{"topic"}, "importance": 0.9})
+	if !d.Allow || d.Args["importance"] != 0.1 || len(d.Args["tags"].([]any)) != 2 {
+		t.Fatalf("update not constrained: %+v", d)
+	}
+	d = f.eval(t, g, "memory", "update_memory", map[string]any{"memory_id": "m", "content": "updated"})
+	if !d.Allow || d.Args["tags"] != nil || d.Args["importance"] != nil {
+		t.Fatalf("update unexpectedly changed absent fields: %+v", d)
+	}
+	for _, tool := range []string{"store_memory", "update_memory"} {
+		for _, tag := range []string{"agent:other", "AGENT:other", "PROJECT:other"} {
+			if d := f.eval(t, g, "memory", tool, map[string]any{"memory_id": "m", "content": "x", "tags": []any{tag}}); d.Allow {
+				t.Fatalf("foreign tag %s admitted", tag)
+			}
+		}
+	}
+	d = f.eval(t, g, "memory", "store_memory", map[string]any{"content": "x"})
+	if !d.Allow || d.Args["importance"] != 0.1 {
+		t.Fatalf("provider default could exceed cap: %+v", d)
 	}
 }

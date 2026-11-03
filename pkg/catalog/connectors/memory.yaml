@@ -3,7 +3,7 @@
 # ownership checks on associate. update_memory and delete_memory reach owner clients; an agent needs the
 # `update` or `delete` operation explicitly, and its namespace still applies.
 connector: memory
-version: 3
+version: 4
 adapter_version: "2.0"
 operations:
   - id: memory.store
@@ -11,6 +11,8 @@ operations:
     risk: reversible
     requires_capability: operations:store
     constraints: [namespaces, store_per_run, max_importance, calls_per_run]
+    argument_constraints:
+      - { kind: max_per_day, key: max_per_day }
     guards: [single_memory_only]
     compact: { fields: [memory_id, status] }
   - id: memory.recall
@@ -18,6 +20,9 @@ operations:
     risk: read
     requires_capability: operations:recall
     constraints: [namespaces, calls_per_run]
+    argument_constraints:
+      - { kind: max_per_day, key: max_per_day }
+      - { kind: row_limit, path: limit, key: max_rows, default: 50 }
     guards: [scoped_recall]          # exact tag match, expansion respects tags, no scope fallback, no id fetch
     response: [namespace_filter]     # drop any result whose record lacks a namespace tag
     compact: { max_string: 200, max_items: 10 }
@@ -26,20 +31,28 @@ operations:
     risk: reversible
     requires_capability: operations:store
     constraints: [namespaces, calls_per_run]
+    argument_constraints:
+      - { kind: max_per_day, key: max_per_day }
     guards: [memory_ownership]       # both memories must carry one of the grant's namespace tags
   - id: memory.update
     tool: update_memory
     risk: reversible
     requires_capability: operations:update
-    constraints: [namespaces, calls_per_run]
+    constraints: [namespaces, max_importance, calls_per_run]
+    argument_constraints:
+      - { kind: max_per_day, key: max_per_day }
     guards: [memory_ownership]
   - id: memory.delete
     tool: delete_memory
     risk: sensitive
     requires_capability: operations:delete
     constraints: [namespaces, calls_per_run]
+    argument_constraints:
+      - { kind: max_per_day, key: max_per_day }
     guards: [memory_ownership, no_bulk_delete]
   - id: memory.health
     tool: check_database_health
     risk: read
     constraints: [calls_per_run]
+    argument_constraints:
+      - { kind: max_per_day, key: max_per_day }

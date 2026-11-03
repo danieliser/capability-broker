@@ -29,7 +29,7 @@ import (
 	"github.com/danieliser/capability-broker/pkg/registry"
 )
 
-var mockBin string
+var mockBin, cleanupBin string
 
 // adapters holds the last newEnv's adapters, for lifecycle assertions.
 var adapters map[string]*upstream.Adapter
@@ -37,7 +37,8 @@ var adapters map[string]*upstream.Adapter
 func TestMain(m *testing.M) {
 	dir, _ := os.MkdirTemp("", "mockmcp")
 	mockBin = filepath.Join(dir, "mockmcp")
-	if out, err := exec.Command("go", "build", "-o", mockBin, "../../cmd/mockmcp").CombinedOutput(); err != nil {
+	cleanupBin = filepath.Join(dir, "brokerd-memory-cleanup")
+	if out, err := exec.Command("go", "build", "-o", dir, "../../cmd/mockmcp", "../../cmd/brokerd-memory-cleanup").CombinedOutput(); err != nil {
 		panic(string(out))
 	}
 	code := m.Run()
@@ -62,6 +63,7 @@ func newEnv(t testing.TB, specs ...*connectors.Spec) *env {
 	reg := registry.New()
 	f := &mcpfront.Front{Store: auth.NewStore(db), Catalog: cat, Audit: audit.NewWriter(db), Registry: reg,
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Stateless: true}
+	t.Cleanup(f.Audit.Close)
 	cacheDir := t.TempDir()
 	adapters = map[string]*upstream.Adapter{}
 	for _, sp := range specs {

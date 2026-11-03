@@ -8,6 +8,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 - docs/reference.md no longer says prompts and resources are not passed through (they are, since 0.9.0).
 - With an empty `connectors.yaml` the broker logs how to add servers instead of asking you to copy the example it already wrote.
+- Preserve denied inherited prefixes, require byte-exact smoke-cleanup tags, and keep owner tool arguments free of agent guards and limits, including exposed actions outside the agent operation map.
+
+- Declarative per-operation argument rules (`allowlist`, `prefix`, `maximum`, `row_limit`, `max_per_day`) run after request enrichment and before the intent receipt. Grants can narrow connector values with `operation_constraints`; child grants retain parent restrictions. Every embedded operation declares a configurable daily budget, persisted by agent/project/operation and UTC date across grants and restarts.
+- The upstream adapter now enforces effective result row ceilings (including verbose responses) and broker call deadlines. WordPress fan-out is restricted to grant sites; memory updates retain namespace tags and importance bounds. Provider scan/spend limits remain provider-side settings.
+- Isolated steward acceptance: named query read, memory store through the broker memory front, scoped recall, effective argument digests, three persisted intent/outcome pairs and two denial receipts.
+- `brokerd-memory-cleanup`: exact paginated smoke inventory and reviewed-ID cleanup, read-only by default; execution requires a manifest and explicit flag, revalidates namespace/content, and verifies removal. Includes the 2026-11-03 one-memory live read inventory; no live deletion performed. Full operation map and Apex runbook in `docs/operation-constraints.md`.
 
 ## [0.11.0] - 2026-11-03
 

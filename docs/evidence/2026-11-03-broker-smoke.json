@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "observed_at": "2026-11-03T10:27:03Z",
+  "tag": "broker-smoke-test",
+  "namespace": "agent:companykit.data-sync-steward",
+  "memories": [
+    {
+      "memory_id": "671c092f-9496-483a-a60e-4a3d3c792053",
+      "tags": [
+        "broker-smoke-test",
+        "agent:companykit.data-sync-steward"
+      ],
+      "content": "Capability broker smoke test 2026-11-01: the data-sync steward grant stored this through brokerd /mcp/memory to prove namespace-forced tags and scoped recall. Safe to delete.",
+      "content_sha256": "d800371ecbee73b1e4b7471ef8ad245ced0bc4236bf0c5b9d4cbcb782befbc1e",
+      "created_at": "2026-11-01T06:40:20.337789+00:00"
+    }
+  ]
+}

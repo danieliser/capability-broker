@@ -1,0 +1,58 @@
+LOCAL FIXTURE QUALIFICATION ONLY - NOT LIVE PROVIDER OR INSTALLED DAEMON PROOF
+Runtime: go1.26.5 darwin/arm64
+Base: capability-broker main e4eb789
+Commands use TMPDIR=$PWD/output/tmp
+
+go build ./... - PASS
+
+
+go test ./... - PASS
+ok  	github.com/danieliser/capability-broker/cmd/brokerd	0.812s
+?   	github.com/danieliser/capability-broker/cmd/brokerd-memory-cleanup	[no test files]
+?   	github.com/danieliser/capability-broker/cmd/brokerd-probe	[no test files]
+?   	github.com/danieliser/capability-broker/cmd/mockmcp	[no test files]
+?   	github.com/danieliser/capability-broker/pkg/adapter	[no test files]
+ok  	github.com/danieliser/capability-broker/pkg/adapters/upstream	0.777s
+ok  	github.com/danieliser/capability-broker/pkg/api	(cached)
+ok  	github.com/danieliser/capability-broker/pkg/audit	2.477s
+ok  	github.com/danieliser/capability-broker/pkg/auth	2.426s
+?   	github.com/danieliser/capability-broker/pkg/buildinfo	[no test files]
+ok  	github.com/danieliser/capability-broker/pkg/catalog	1.169s
+?   	github.com/danieliser/capability-broker/pkg/compact	[no test files]
+?   	github.com/danieliser/capability-broker/pkg/config	[no test files]
+ok  	github.com/danieliser/capability-broker/pkg/connectors	0.931s
+?   	github.com/danieliser/capability-broker/pkg/durable	[no test files]
+ok  	github.com/danieliser/capability-broker/pkg/mcpfront	2.974s
+ok  	github.com/danieliser/capability-broker/pkg/memorycleanup	(cached)
+ok  	github.com/danieliser/capability-broker/pkg/pins	1.480s
+ok  	github.com/danieliser/capability-broker/pkg/policy	1.291s
+?   	github.com/danieliser/capability-broker/pkg/registry	[no test files]
+?   	github.com/danieliser/capability-broker/pkg/reload	[no test files]
+ok  	github.com/danieliser/capability-broker/pkg/remoteauth	1.795s
+ok  	github.com/danieliser/capability-broker/test/e2e	12.290s
+
+go vet ./... - PASS
+
+
+go test -race ./pkg/mcpfront ./pkg/auth ./pkg/policy ./pkg/memorycleanup - PASS
+ok  	github.com/danieliser/capability-broker/pkg/mcpfront	7.495s
+ok  	github.com/danieliser/capability-broker/pkg/auth	3.491s
+ok  	github.com/danieliser/capability-broker/pkg/policy	6.084s
+ok  	github.com/danieliser/capability-broker/pkg/memorycleanup	(cached)
+
+go test ./test/e2e -run '^Test(CleanupCommandDefaultsToDryRun|StewardBrokerAcceptance)$' -v -count=1 - PASS
+=== RUN   TestCleanupCommandDefaultsToDryRun
+    cleanup_test.go:111: built CLI: inventory and manifest modes made no writes; explicit execute deleted one local fixture ID and verified absence
+--- PASS: TestCleanupCommandDefaultsToDryRun (0.57s)
+=== RUN   TestStewardBrokerAcceptance
+    steward_test.go:191: broker acceptance: named read -> broker memory store -> scoped recall; 8 persisted receipts (3 intent/outcome pairs, 2 denials), grant 42769048-3a49-42ce-a4f1-72de1f76775c
+--- PASS: TestStewardBrokerAcceptance (0.11s)
+PASS
+ok  	github.com/danieliser/capability-broker/test/e2e	14.540s
+
+gofmt (source) and git diff --check - PASS
+Focused staged plaintext credential-pattern scan - 0 findings
+Gitleaks 8.30.1: gitleaks git . --log-opts=e4eb789..HEAD --redact=100 --no-banner --no-color - PASS
+4 commits scanned; no leaks found
+Built cleanup CLI -h and manifest-required refusal - PASS
+No live memory deletion, install, restart, database/config edits, push or merge.

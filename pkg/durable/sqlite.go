@@ -41,6 +41,14 @@ CREATE TABLE IF NOT EXISTS counters (
   PRIMARY KEY (grant_id, key)
 );
 
+CREATE TABLE IF NOT EXISTS daily_counters (
+  scope TEXT NOT NULL,
+  operation TEXT NOT NULL,
+  day TEXT NOT NULL,
+  count INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (scope, operation, day)
+);
+
 CREATE TABLE IF NOT EXISTS receipts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   ts TEXT NOT NULL,

@@ -30,6 +30,7 @@ import (
 	"github.com/danieliser/capability-broker/pkg/catalog"
 	"github.com/danieliser/capability-broker/pkg/compact"
 	"github.com/danieliser/capability-broker/pkg/connectors"
+	"github.com/danieliser/capability-broker/pkg/policy"
 	"github.com/danieliser/capability-broker/pkg/remoteauth"
 )
 
@@ -369,7 +370,7 @@ func (a *Adapter) Tools(ctx context.Context, g *auth.Grant) ([]catalog.Tool, err
 	owner := g.Capabilities.IsOwner()
 	out := make([]catalog.Tool, 0, len(tools))
 	for _, t := range tools {
-		if !conn.ToolExposed(t.Name) || !a.spec.Tools.Allows(t.Name) {
+		if conn.ToolDenied(t.Name) || (!owner && !conn.ToolExposed(t.Name)) || !a.spec.Tools.Allows(t.Name) {
 			continue
 		}
 		if !owner && !reachable(conn.OperationsFor(t.Name), cap) {
@@ -481,8 +482,29 @@ func (a *Adapter) transform(name string, t catalog.Tool, cap auth.ConnectorCapab
 	return t
 }
 
-// Execute runs the guards, forwards the call to the child with a progress token
-// for the relay, then runs the response hooks and shapes the result.
+// Prepare applies request hooks before final argument policy and the intent receipt.
+func (a *Adapter) Prepare(ctx context.Context, call adapter.Call) (adapter.Call, error) {
+	if !a.spec.Tools.Allows(call.Tool) {
+		return call, &adapter.UpstreamError{Code: "BROKER_TOOL_NOT_EXPOSED", Message: call.Tool + " is excluded by the connector's tools filter"}
+	}
+	s, _, err := a.ensure(ctx)
+	if err != nil {
+		return call, err
+	}
+	if call.Grant != nil && call.Grant.Capabilities.IsOwner() {
+		return call, nil
+	}
+	args := policy.CloneArgs(call.Decision.Args)
+	for _, hook := range call.Op.Guards {
+		if err := a.guard(ctx, s, hook, call, args); err != nil {
+			return call, err
+		}
+	}
+	call.Decision.Args = args
+	return call, nil
+}
+
+// Execute forwards the prepared and authorised call, then applies response policy and shaping.
 func (a *Adapter) Execute(ctx context.Context, call adapter.Call) (*adapter.Result, error) {
 	a.touch()
 	defer a.untouch()
@@ -493,22 +515,21 @@ func (a *Adapter) Execute(ctx context.Context, call adapter.Call) (*adapter.Resu
 	if err != nil {
 		return nil, err
 	}
-	args := map[string]any{}
-	for k, v := range call.Decision.Args {
-		args[k] = v
-	}
-	for _, g := range call.Op.Guards {
-		if err := a.guard(ctx, s, g, call, args); err != nil {
-			return nil, err
-		}
-	}
+	args := call.Decision.Args
 	callID := call.CallID
 	if callID == "" {
 		callID = uuid.NewString()
 	}
 	a.relay.begin(callID, call.Session, call.ProgressToken)
 	defer a.relay.end(callID)
-	cctx, cancel := context.WithTimeout(ctx, a.spec.CallTimeout)
+	timeout := a.spec.CallTimeout
+	if v, ok := call.Decision.Limits["max_execution_seconds"].(float64); ok && v > 0 {
+		bound := time.Duration(v * float64(time.Second))
+		if timeout <= 0 || bound < timeout {
+			timeout = bound
+		}
+	}
+	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	params := &mcp.CallToolParams{Name: call.Tool, Arguments: args, Meta: mcp.Meta{"progressToken": callID}}
 	res, err := s.CallTool(cctx, params)
@@ -545,6 +566,9 @@ func (a *Adapter) Execute(ctx context.Context, call adapter.Call) (*adapter.Resu
 		if err != nil {
 			return nil, err
 		}
+	}
+	if err := policy.CheckResultRows(payload, call.Decision.Limits); err != nil {
+		return nil, adapter.Denied(err.Error())
 	}
 	return &adapter.Result{
 		Compact: shape(payload, call.Op), Verbose: payload, Outcome: adapter.OutcomeCompleted, OutcomeClass: "ok",

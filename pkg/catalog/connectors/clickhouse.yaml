@@ -1,6 +1,6 @@
 # Policy for the stock `mcp-clickhouse` server (tools discovered at runtime: run_query, list_databases, list_tables).
 connector: clickhouse
-version: 2
+version: 3
 adapter_version: "2.0"
 describe:
   run_query: named_queries        # append the grant's named queries to the tool description
@@ -10,6 +10,9 @@ operations:
     match: { query: "^@[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$" }
     risk: read
     constraints: [queries, max_rows, max_execution_seconds, calls_per_run]
+    argument_constraints:
+      - { kind: max_per_day, key: max_per_day }
+      - { kind: row_limit, path: max_rows, key: max_rows }
     guards: [resolve_named_query]   # "@group.name" + params → the catalogued SQL + bound params
     compact: { max_items: 20 }
     description: Run a named, parameterised, read-only query the grant lists.
@@ -18,6 +21,9 @@ operations:
     risk: read
     requires_capability: sql.select
     constraints: [max_rows, max_execution_seconds, calls_per_run]
+    argument_constraints:
+      - { kind: max_per_day, key: max_per_day }
+      - { kind: row_limit, path: max_rows, key: max_rows }
     guards: [single_statement, select_only]
     compact: { max_items: 20 }
     description: Run an ad-hoc read-only statement (SELECT, WITH, SHOW, DESCRIBE, EXPLAIN, EXISTS).
@@ -25,10 +31,16 @@ operations:
     tool: list_databases
     risk: read
     requires_capability: sql.select
-    constraints: [calls_per_run]
+    constraints: [max_rows, max_execution_seconds, calls_per_run]
+    argument_constraints:
+      - { kind: max_per_day, key: max_per_day }
+      - { kind: row_limit, path: max_rows, key: max_rows }
   - id: clickhouse.schema.tables
     tool: list_tables
     risk: read
     requires_capability: sql.select
-    constraints: [calls_per_run]
+    constraints: [max_rows, max_execution_seconds, calls_per_run]
+    argument_constraints:
+      - { kind: max_per_day, key: max_per_day }
+      - { kind: row_limit, path: max_rows, key: max_rows }
     compact: { max_items: 50 }
