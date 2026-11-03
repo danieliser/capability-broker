@@ -4,6 +4,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-03
+
+- Install without Go: `install.sh` downloads the release binary for your OS and CPU and verifies it against the release's `SHA256SUMS` (default outside a clone, or `--binary`). Linux runs it as a `systemd --user` service; `--no-service` installs the binary only. The service's PATH is the one you installed from, so npx, uvx, node and python resolve as in your shell.
+- A connector with a missing secret or an invalid field is skipped and shown in `brokerd status` ("not loaded: …"); the others keep running. Before, one bad connector stopped the broker from starting, which every new install hit with the example config.
+- `connectors.example.yaml` starts empty with commented examples.
+- Requests from web pages on other sites (an http/https `Origin` that is not localhost) are refused, against DNS rebinding.
+- `brokerd client restore` puts a Codex server back from the broker's record when the per-server install had replaced its parked table (the server was lost from Codex before).
+- `SECURITY.md`, `CONTRIBUTING.md`, issue templates; README install, status and limits sections; examples no longer name the author's own sites and accounts.
+- Benchmarks re-measured on 0.11.0: ≈0.35 ms added per call, broker ≈70 MB resident with 312 tools.
+
 ## [0.10.1] - 2026-11-03
 
 - Outcome and denial receipts are written in batches off the call path (the intent row stays synchronous, so a failed intent write still denies the call); SQLite runs WAL with `synchronous=NORMAL`. Per call through the broker: 0.70 ms → 0.60 ms in `test/e2e` benchmarks.

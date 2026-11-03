@@ -141,3 +141,17 @@ func TestApplyCodexKeepsBrokerToolApprovals(t *testing.T) {
 		t.Fatalf("broker table duplicated:\n%s", got)
 	}
 }
+
+func TestReinsertCodexReplacesBrokerEntry(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	_ = os.WriteFile(path, []byte("model = \"x\"\n\n[mcp_servers.mock]\nurl = \"http://127.0.0.1:8890/mcp/mock\"\nenabled = true\n\n[mcp_servers.mock.tools.t]\napproval_mode = \"prompt\"\n"), 0o600)
+	ok, err := reinsertCodex(path, "mock", "[mcp_servers.mock]\ncommand = \"x\"\nenabled = false\n")
+	if !ok || err != nil {
+		t.Fatalf("%v %v", ok, err)
+	}
+	got, _ := os.ReadFile(path)
+	s := string(got)
+	if strings.Contains(s, "127.0.0.1") || !strings.Contains(s, "command = \"x\"\nenabled = true") || !strings.Contains(s, "approval_mode = \"prompt\"") || !strings.Contains(s, "model = \"x\"") {
+		t.Fatalf("got:\n%s", s)
+	}
+}

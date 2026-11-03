@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Broker tool-passthrough eval: low-effort models, three client setups, six tasks, graded against live data
+"""This harness is a record of the evaluation in docs/eval.md: its tasks and answers come from the author's own
+ClickHouse warehouse and WordPress sites. Adapt LIVE and TASKS to your own data to rerun it.
+
+Broker tool-passthrough eval: low-effort models, three client setups, six tasks, graded against live data
 and the broker's own receipts. Usage: eval.py [--reps N] [--models haiku,luna] [--setups ...] [--tasks ...] [--jobs N]"""
 import argparse, concurrent.futures as cf, json, os, subprocess, tempfile, time, uuid, urllib.request, base64, sys
 

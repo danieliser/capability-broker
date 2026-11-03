@@ -1,9 +1,10 @@
 # Benchmarks
 
-Measured 2026-11-03 on an Apple M2 Max (macOS), brokerd 0.9.0, with 14 connectors: 8 local stdio servers
+Measured 2026-11-03 on an Apple M2 Max (macOS) with brokerd 0.9.0 (memory, context) and 0.11.0 (latency,
+broker memory, tool definitions), with 14 connectors: 8 local stdio servers
 (ClickHouse, AutoMem, three Gmail accounts, Metabase, a WordPress router, DataForSEO) and 6 remote ones (Vercel,
-Stack Overflow for Agents, OpenAI docs, Cloudflare ×2, Cloudways; the Cloudflare and Cloudways ones were not
-signed in, so their tools are not counted). Every number has a script in
+Stack Overflow for Agents, OpenAI docs, Cloudflare ×2, Cloudways). Resident memory moves with what else the
+machine is doing (macOS compresses idle pages), so treat memory figures as ±20%. Every number has a script in
 `bench/` or `test/e2e/`.
 
 ## Memory: one copy of each server instead of one per app
@@ -23,20 +24,29 @@ session, so several open chats multiply the "before" column again. Reproduce wit
 
 With `on_demand: true` on the four least-used servers (Metabase, DataForSEO, two Gmail accounts), the broker
 starts only the other four at boot: about 314 MB of servers instead of 570 MB. A call to a stopped server starts it
-(0.3 s for a pinned Node server) and `idle_stop` stops it again. The broker itself is 55–60 MB after GC tuning
-(`GOMEMLIMIT` 48 MiB, `GOGC` 50), down from 70–75 MB; its live heap is about 24 MB, mostly upstream tool schemas.
+(0.3 s for a pinned Node server, 2.3 s for a Python server run through `uv`) and `idle_stop` stops it again.
 
 ## Latency added per tool call
 
-| Path | Per call |
+| Path (brokerd 0.11.0) | Per call, median of 5 runs |
 |---|---|
-| Client → stdio server directly | 0.115 ms |
-| Client → brokerd (Streamable HTTP, grant check, receipts) → same stdio server | 0.70 ms |
-| **Added by the broker** | **≈ 0.6 ms** |
+| Client → stdio server directly | 0.19 ms |
+| Client → brokerd (Streamable HTTP, grant check, receipts) → same stdio server | 0.54 ms |
+| **Added by the broker** | **≈ 0.35 ms** |
 
-Method: `go test ./test/e2e -run '^$' -bench . -benchtime 2000x -count 3` calls the mock server's `echo` tool
-2,000 times per run, three runs each; the table shows the median run. Network-bound upstreams take tens to
+Method: `go test ./test/e2e -run '^$' -bench . -benchtime 2000x -count 5` calls the mock server's `echo` tool
+2,000 times per run. The machine was not idle (load average ~4.9 from other work), so single runs ranged 0.15–0.36
+ms direct and 0.45–0.63 ms through the broker. Since 0.10.1 the after-call receipt is written in batches off the
+call path (0.9.0 measured 0.70 ms through the broker on a quieter machine). Network-bound upstreams take tens to
 hundreds of milliseconds per call, so the broker's share is noise there.
+
+## The broker itself
+
+0.11.0 after 15 minutes with 14 connectors and 312 tools: **about 70 MB resident, 27 MB of live heap**, half of
+it upstream tool schemas (Vercel's 241 tools are most of that). The rest is the Go runtime and the program
+(`GOMEMLIMIT` 48 MiB and `GOGC` 50 by default; set either in the environment to override). A Rust port of the
+core (kept on the `exp/rust-port-full` branch, not at parity) ran the same mock server in 15–19 MB at 0.37 ms per
+call; see `rust/COMPARISON-FULL.md` on that branch.
 
 ## Context: what a chat pays for its tools
 
@@ -44,7 +54,7 @@ Tool definitions brokerd serves for the connectors above:
 
 | Setup | Tools listed | Definition size |
 |---|---|---|
-| Every connector preloaded | 304 | 1.05 MB (≈ 263k tokens at 4 chars/token) |
+| Every connector preloaded | 312 | 1.07 MB (≈ 268k tokens at 4 chars/token) |
 | Every connector on demand (`expose: broker`) | 3 (`search_tools`, `describe_tool`, `call_tool`) | 1.6 KB (≈ 400 tokens) |
 
 That is what an MCP client without its own tool search pays, since it loads every schema up front (agents built

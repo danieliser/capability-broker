@@ -171,7 +171,7 @@ func runGrant(ctx context.Context, args []string) int {
 	return fail("unknown grant subcommand %s", args[0])
 }
 
-// queries push --project companykit --file .persist/broker/queries.yaml
+// queries push --project my-project --file .persist/broker/queries.yaml
 func runQueries(ctx context.Context, args []string) int {
 	if len(args) == 0 {
 		return fail("usage: brokerd queries push --project <key> --file <queries.yaml> | list")

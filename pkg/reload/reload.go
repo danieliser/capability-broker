@@ -50,6 +50,7 @@ type Reloader struct {
 	mu        sync.Mutex
 	digests   map[string]string // connector → spec digest
 	filesSeen string            // fingerprint of the watched files
+	issues    map[string]string // connectors skipped by the last load, and why
 }
 
 // Result describes what one reconcile did.
@@ -80,10 +81,16 @@ func (r *Reloader) Apply(ctx context.Context) (Result, error) {
 	if err := cfg.LoadSecrets(); err != nil {
 		return res, err
 	}
-	specs, err := connectors.Load(cfg.ConnectorsPath(), cfg.Secrets)
+	specs, issues, err := connectors.LoadAll(cfg.ConnectorsPath(), cfg.Secrets)
 	if err != nil {
 		return res, err
 	}
+	for name, why := range issues {
+		if r.issues[name] != why {
+			r.log("connector skipped", "connector", name, "reason", why)
+		}
+	}
+	r.issues = issues
 	if r.Pins != nil {
 		r.Pins.Apply(specs)
 		// Resolve and install missing or stale pins in the background; pins.json changing triggers the next
@@ -199,6 +206,17 @@ func (r *Reloader) startWithRetry(ctx context.Context, name string, ad *upstream
 			backoff *= 2
 		}
 	}
+}
+
+// Issues returns the connectors the last load skipped (missing secret, invalid field) and why.
+func (r *Reloader) Issues() map[string]string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make(map[string]string, len(r.issues))
+	for k, v := range r.issues {
+		out[k] = v
+	}
+	return out
 }
 
 // Reconnect starts a connector again (after a sign-in) and refreshes live servers when it connects.
