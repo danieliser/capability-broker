@@ -508,7 +508,9 @@ func (m minLevel) WithAttrs(attrs []slog.Attr) slog.Handler {
 	return minLevel{m.Handler.WithAttrs(attrs), m.min}
 }
 
-func (m minLevel) WithGroup(name string) slog.Handler { return minLevel{m.Handler.WithGroup(name), m.min} }
+func (m minLevel) WithGroup(name string) slog.Handler {
+	return minLevel{m.Handler.WithGroup(name), m.min}
+}
 
 // SweepIdle drops cached servers nobody has used for maxIdle (a new request rebuilds one in milliseconds). Each
 // app, grant and option set gets its own server, and changed instructions create new ones, so without this the
