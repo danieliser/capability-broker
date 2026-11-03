@@ -31,8 +31,8 @@ headless get the same keys you do.
 | Measured | |
 |---|---|
 | Memory, 8 local servers, every app open | 2,424 MB → 645 MB |
-| Latency added per tool call | ≈ 0.6 ms |
-| Tool definitions loaded per chat, 304 tools | 1.05 MB → 1.6 KB on demand |
+| Latency added per tool call | ≈ 0.35 ms |
+| Tool definitions loaded per chat, 312 tools | 1.07 MB → 1.6 KB on demand |
 
 Methods and caveats in [docs/benchmarks.md](docs/benchmarks.md).
 

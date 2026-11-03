@@ -71,7 +71,7 @@ type Writer struct {
 }
 
 func NewWriter(db *sql.DB) *Writer {
-	w := &Writer{db: db, queue: make(chan Receipt, 4096), done: make(chan struct{})}
+	w := &Writer{db: db, queue: make(chan Receipt, 512), done: make(chan struct{})}
 	go w.drain()
 	return w
 }
