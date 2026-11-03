@@ -683,9 +683,14 @@ func numberOf(v any) (int, bool) {
 type catalogTool = catalog.Tool
 
 func toCatalogTool(t *mcp.Tool) catalog.Tool {
-	schema := map[string]any{}
-	if raw, err := json.Marshal(t.InputSchema); err == nil {
-		_ = json.Unmarshal(raw, &schema)
+	// Share the schema the SDK already decoded instead of keeping a second copy (tool schemas are most of the
+	// broker's heap). Every writer copies first (withVerbose, narrow_site_enum), so sharing is safe.
+	schema, ok := t.InputSchema.(map[string]any)
+	if !ok {
+		schema = map[string]any{}
+		if raw, err := json.Marshal(t.InputSchema); err == nil {
+			_ = json.Unmarshal(raw, &schema)
+		}
 	}
 	return catalog.Tool{Name: t.Name, Description: t.Description, InputSchema: schema, Upstream: t}
 }

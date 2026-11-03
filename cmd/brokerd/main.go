@@ -120,6 +120,7 @@ func run(cfg config.Config, stateless bool) error {
 	}
 	store := auth.NewStore(db)
 	writer := audit.NewWriter(db)
+	defer writer.Close() // runs before db.Close: queued receipts are written first
 	reg := registry.New()
 	front := &mcpfront.Front{Store: store, Catalog: cat, Audit: writer, Registry: reg, Logger: logger, SessionTimeout: 30 * time.Minute, Stateless: stateless}
 	oauthMgr := &remoteauth.Manager{DataDir: cfg.DataDir, CallbackURL: "http://" + cfg.FrontAddr() + remoteauth.CallbackPath,
