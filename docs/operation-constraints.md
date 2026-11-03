@@ -177,3 +177,12 @@ undo. Do not use bulk tag deletion.
 The old binary ignores it; rollback leaves it in place. Existing grants without `max_per_day` continue without a
 daily cap. Operator `catalog.d` overlays replace the embedded connector entirely: Apex must review/port the new
 rules into any active overlay to enable them there. The builder makes no live config/database edits or restarts.
+
+### Independent review corrections
+
+Owner grants bypass agent argument policy and request guards. Connector exposure
+and explicitly configured response shaping still apply; receipts still record the
+arguments actually forwarded. An exposed owner tool action need not match an agent
+operation pattern. Empty inherited prefixes remain denied through child grants.
+Cleanup inventory requests exact tag matching and revalidation compares scope tags
+byte for byte, without Unicode or case folding.

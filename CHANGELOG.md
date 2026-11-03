@@ -4,6 +4,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+- Preserve denied inherited prefixes, require byte-exact smoke-cleanup tags, and keep owner tool arguments free of agent guards and limits, including exposed actions outside the agent operation map.
+
 - Declarative per-operation argument rules (`allowlist`, `prefix`, `maximum`, `row_limit`, `max_per_day`) run after request enrichment and before the intent receipt. Grants can narrow connector values with `operation_constraints`; child grants retain parent restrictions. Every embedded operation declares a configurable daily budget, persisted by agent/project/operation and UTC date across grants and restarts.
 - The upstream adapter now enforces effective result row ceilings (including verbose responses) and broker call deadlines. WordPress fan-out is restricted to grant sites; memory updates retain namespace tags and importance bounds. Provider scan/spend limits remain provider-side settings.
 - Isolated steward acceptance: named query read, memory store through the broker memory front, scoped recall, effective argument digests, three persisted intent/outcome pairs and two denial receipts.
