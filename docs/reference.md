@@ -11,7 +11,8 @@ The full behaviour, feature by feature. Start with the [README](../README.md).
 - **Invisible to its owner.** Owner client tokens see each upstream exactly as if connected directly: tool
   definitions (annotations, output schemas, titles), results (all content blocks, `structuredContent`, `isError`)
   and the upstream's own instructions pass through untouched. Policy, compaction and the `verbose` flag apply to
-  agent grants only. Prompts and resources are not passed through yet (logged when an upstream has any).
+  agent grants only. Prompts, resources and resource templates pass through to owner clients too (not to agents),
+  and upstream list changes reach connected clients.
 - **Grants, not credentials.** A caller holds a random bearer (`cbg_…` for agents, `cbc_…` for owner clients)
   bound to a capability set: named queries, sites, operations, namespaces, limits. Hashes at rest, revocation
   checked on every call, child grants can only narrow. Agent grants are minted by the control plane (PERSIST)

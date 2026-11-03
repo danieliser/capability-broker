@@ -4,6 +4,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-11-03
+
+- docs/reference.md no longer says prompts and resources are not passed through (they are, since 0.9.0).
+- With an empty `connectors.yaml` the broker logs how to add servers instead of asking you to copy the example it already wrote.
+
 ## [0.11.0] - 2026-11-03
 
 - Install without Go: `install.sh` downloads the release binary for your OS and CPU and verifies it against the release's `SHA256SUMS` (default outside a clone, or `--binary`). Linux runs it as a `systemd --user` service; `--no-service` installs the binary only. The service's PATH is the one you installed from, so npx, uvx, node and python resolve as in your shell.

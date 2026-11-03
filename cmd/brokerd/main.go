@@ -134,7 +134,7 @@ func run(cfg config.Config, stateless bool) error {
 	if res, err := reloader.Apply(ctx); err != nil {
 		return fmt.Errorf("initial load: %w", err)
 	} else if len(res.Added) == 0 {
-		logger.Warn("no connectors configured; copy connectors.example.yaml to the data dir", "path", cfg.ConnectorsPath())
+		logger.Warn("no connectors configured yet; add servers to connectors.yaml or run `brokerd client adopt <server>`", "path", cfg.ConnectorsPath())
 	}
 	defer closeAll(reg, 1500*time.Millisecond)
 	// Hot reload: poll the data-root files, and apply on SIGHUP too.
