@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/pprof"
 	"strconv"
 	"strings"
 	"time"
@@ -88,6 +89,15 @@ func (a *Admin) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/catalog/queries", a.auth(a.listQueries))
 	mux.HandleFunc("GET /v1/receipts", a.auth(a.receipts))
 	mux.HandleFunc("POST /v1/reload", a.auth(a.reload))
+	// Profiles, admin token only: GET /debug/pprof/heap, /debug/pprof/goroutine, /debug/pprof/profile?seconds=10.
+	mux.HandleFunc("GET /debug/pprof/{name}", a.auth(func(w http.ResponseWriter, r *http.Request) {
+		switch name := r.PathValue("name"); name {
+		case "profile":
+			pprof.Profile(w, r)
+		default:
+			pprof.Handler(name).ServeHTTP(w, r)
+		}
+	}))
 	mux.HandleFunc("POST /v1/auth/{connector}", a.auth(a.beginAuth))
 	mux.HandleFunc("GET /v1/auth/{connector}", a.auth(a.authStatus))
 	mux.HandleFunc("DELETE /v1/auth/{connector}", a.auth(a.signOut))
