@@ -720,13 +720,15 @@ func (f *Front) call(ctx context.Context, connector, tool string, req *mcp.CallT
 	if err != nil {
 		ue, ok := adapter.AsUpstream(err)
 		code, msg, state := adapter.CodeUpstreamError, "upstream call failed", audit.StateFailed
+		requestID := ""
 		if ok {
 			code, msg = ue.Code, ue.Message
+			requestID = ue.UpstreamRequestID
 			if ue.Outcome == adapter.OutcomeUnknown {
 				state = audit.StateOutcomeUnknown
 			}
 		}
-		_ = f.Audit.Outcome(ctx, callID, base, audit.Outcome{State: state, OutcomeClass: code, Duration: time.Since(started)})
+		_ = f.Audit.Outcome(ctx, callID, base, audit.Outcome{State: state, OutcomeClass: code, UpstreamRequestID: requestID, Duration: time.Since(started)})
 		return toolError(code, msg), nil
 	}
 	if res.Raw != nil {

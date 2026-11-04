@@ -52,9 +52,10 @@ type Result struct {
 
 // UpstreamError is a failure the agent should see, with a stable code.
 type UpstreamError struct {
-	Code    string
-	Message string
-	Outcome Outcome
+	Code              string
+	Message           string
+	Outcome           Outcome
+	UpstreamRequestID string
 }
 
 func (e *UpstreamError) Error() string { return e.Code + ": " + e.Message }

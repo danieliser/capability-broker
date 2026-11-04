@@ -579,6 +579,13 @@ func (a *Adapter) Execute(ctx context.Context, call adapter.Call) (*adapter.Resu
 		}
 	}
 	if res.IsError {
+		if call.Op.Flow != nil && call.Op.Flow.EffectClass != "read" {
+			// A workflow can perform an effect before a later node fails. Even
+			// valid execution metadata and isError do not prove no effect occurred.
+			return nil, &adapter.UpstreamError{Code: adapter.CodeUpstreamError,
+				Message: "effectful flow returned an error; reconcile possible partial effects before retry", Outcome: adapter.OutcomeUnknown,
+				UpstreamRequestID: payload.(map[string]any)["n8n_execution_id"].(string)}
+		}
 		msg, _ := json.Marshal(payload)
 		return nil, adapter.Failed(string(msg))
 	}

@@ -186,7 +186,8 @@ Return a JSON object (MCP structuredContent or a single JSON text block):
 The workflow must derive workflow/version/execution fields from its actual n8n
 execution context, not echo caller labels. Broker validation requires matching
 correlation and deployment metadata plus a non-empty execution ID. Missing or
-mismatched fields, timeout, or a connection lost after dispatch produce an
+mismatched fields, timeout, an effectful workflow's error result (which can follow
+partial effects), or a connection lost after dispatch produce an
 `outcome_unknown` receipt: reconcile, never blindly retry effects. This checks the
 trusted workflow's report, not an independent n8n execution API readback.
 It is also not a pre-dispatch version fence: the deployer must disable/review and

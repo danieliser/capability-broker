@@ -5,6 +5,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 ## [Unreleased]
 
 - Prevent agent effectful flow replays with durable, atomic project/flow idempotency reservations, including retries after unknown outcomes and across grants or broker restarts. Owner calls bypass the replay guard.
+- Treat effectful workflow error results as `outcome_unknown`: a later node failure cannot prove that earlier effects did not happen. Owner error results remain verbatim.
 
 - Add an owner `n8n` Streamable HTTP recipe using the broker secret store, original tool names/results and an empty agent catalog. Enforce `owner_only` at discovery and dispatch as well as grant minting.
 - Add deny-by-default `n8n-flows` workflow-tool catalogs: reviewed logical IDs/deployments, `flows.run`, per-grant allowlists, separate write/send/spend capabilities, required daily budgets, grant-derived run correlation and execution receipts. Ambiguous flow responses/connections remain `outcome_unknown`. Includes fixture HTTP coverage and the Apex installation/rollback runbook; no live installation or restart.

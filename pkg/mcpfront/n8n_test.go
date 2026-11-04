@@ -503,3 +503,28 @@ func TestN8nReviewManagementPaths(t *testing.T) {
 		t.Fatalf("management denials reached upstream %d times", f.count())
 	}
 }
+
+func TestN8nEffectErrorRequiresReconciliation(t *testing.T) {
+	h, f, _, _ := n8nHarness(t)
+	f.mu.Lock()
+	f.isError = true
+	f.mu.Unlock()
+	s := h.connect(t, flowToken(t, h, flowCaps("flows.run", "flows.write"), "partial-effect-run"), "n8n-flows")
+	res := callFixture(t, s, "fixture_write", map[string]any{"idempotency_key": "partial-effect"})
+	if !res.IsError {
+		t.Fatal("errored workflow reported success")
+	}
+	receipts, err := h.audit.List(context.Background(), 0, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range receipts {
+		if r.RunID == "partial-effect-run" && r.Phase == "outcome" {
+			if r.State != audit.StateOutcomeUnknown || r.UpstreamRequestID != "exec-fixture-1" || !strings.Contains(text(res), "reconcile") {
+				t.Fatalf("partial effects treated as known failure: state=%s response=%s", r.State, text(res))
+			}
+			return
+		}
+	}
+	t.Fatal("missing effect outcome receipt")
+}
