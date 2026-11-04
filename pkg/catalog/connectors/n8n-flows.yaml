@@ -1,0 +1,5 @@
+# Deny by default until the owner installs reviewed workflow-tool bindings.
+connector: n8n-flows
+version: 1
+adapter_version: "1.0"
+operations: []

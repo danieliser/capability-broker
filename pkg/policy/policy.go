@@ -68,6 +68,9 @@ func Evaluate(ctx context.Context, g *auth.Grant, connector string, op *catalog.
 	if owner {
 		return d, nil
 	}
+	if dd := checkFlow(g, cap, op, &d); dd != nil {
+		return *dd, nil
+	}
 
 	if op.RequiresCapability != "" && !owner {
 		switch {

@@ -59,6 +59,8 @@ type Operation struct {
 	Compact             map[string]any       `yaml:"compact,omitempty"`             // fields: [...] | max_items | max_string
 	Description         string               `yaml:"description,omitempty"`
 	ArgumentConstraints []ArgumentConstraint `yaml:"argument_constraints,omitempty"`
+	// Flow binds an n8n workflow tool to reviewed deployment metadata, never caller labels.
+	Flow *Flow `yaml:"flow,omitempty"`
 
 	compiled map[string]*regexp.Regexp
 }
@@ -164,14 +166,26 @@ func (c *Connector) compile() error {
 		return fmt.Errorf("connector name is required")
 	}
 	seen := map[string]bool{}
+	flowIDs := map[string]bool{}
 	for _, op := range c.Operations {
 		if op.ID == "" || op.Tool == "" {
 			return fmt.Errorf("operation needs id and tool")
 		}
-		if seen[op.ID] {
+		if err := validateFlow(c.Connector, op); err != nil {
+			return err
+		}
+		key := op.ID
+		if op.Flow != nil {
+			key += "/" + op.Tool // workflow tools share the flows.run policy/budget key
+			if flowIDs[op.Flow.ID] {
+				return fmt.Errorf("duplicate logical flow %s", op.Flow.ID)
+			}
+			flowIDs[op.Flow.ID] = true
+		}
+		if seen[key] {
 			return fmt.Errorf("duplicate operation %s", op.ID)
 		}
-		seen[op.ID] = true
+		seen[key] = true
 		if op.Risk == "" {
 			return fmt.Errorf("operation %s needs a risk", op.ID)
 		}

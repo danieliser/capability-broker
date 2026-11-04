@@ -129,6 +129,11 @@ func (f *Front) gate(w http.ResponseWriter, r *http.Request, connector string) *
 		return nil
 	}
 	if connector != "" {
+		if sp := f.specOf(connector); sp != nil && sp.OwnerOnly && !g.Capabilities.IsOwner() {
+			f.Audit.Denied(r.Context(), audit.Call{Grant: g, Connector: connector, Tool: "-"}, policy.CodeDeniedConnector, "connector is owner-only")
+			writeError(w, http.StatusForbidden, policy.CodeDeniedConnector, "connector is owner-only")
+			return nil
+		}
 		if _, ok := g.Capabilities.For(connector); !ok {
 			f.Audit.Denied(r.Context(), audit.Call{Grant: g, Connector: connector, Tool: "-"}, policy.CodeDeniedConnector, "grant does not reach "+connector)
 			writeError(w, http.StatusForbidden, policy.CodeDeniedConnector, "grant does not reach connector "+connector)
@@ -625,6 +630,10 @@ func (f *Front) call(ctx context.Context, connector, tool string, req *mcp.CallT
 	conn, _ := f.Catalog.Connector(connector)
 	base := audit.Call{Grant: g, Connector: connector, Tool: tool, Args: args, PolicyVersion: f.Catalog.PolicyVersion(),
 		IdempotencyKey: idem, Verbose: verbose, RequestBytes: requestBytes}
+	if sp := f.specOf(connector); sp != nil && sp.OwnerOnly && !g.Capabilities.IsOwner() {
+		f.Audit.Denied(ctx, base, policy.CodeDeniedConnector, "connector is owner-only")
+		return toolError(policy.CodeDeniedConnector, "connector is owner-only"), nil
+	}
 	if conn == nil || conn.ToolDenied(tool) || (!g.Capabilities.IsOwner() && !conn.ToolExposed(tool)) {
 		f.Audit.Denied(ctx, base, policy.CodeDeniedOperation, "tool not exposed")
 		return toolError(policy.CodeDeniedOperation, fmt.Sprintf("tool %s is not available through this connector", tool)), nil

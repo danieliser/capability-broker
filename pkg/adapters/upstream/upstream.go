@@ -357,6 +357,9 @@ func (a *Adapter) Health(ctx context.Context) error {
 // could satisfy. Owner grants see every exported tool. Transforms and
 // description hooks from the catalog apply per grant.
 func (a *Adapter) Tools(ctx context.Context, g *auth.Grant) ([]catalog.Tool, error) {
+	if a.spec.OwnerOnly && !g.Capabilities.IsOwner() {
+		return nil, nil
+	}
 	if !(a.cached.Load() && !a.ready.Load()) {
 		if _, _, err := a.ensure(ctx); err != nil {
 			return nil, err
@@ -391,6 +394,9 @@ func (a *Adapter) Tools(ctx context.Context, g *auth.Grant) ([]catalog.Tool, err
 // reachable: at least one operation on the tool has a capability requirement this grant meets.
 func reachable(ops []*catalog.Operation, cap auth.ConnectorCapability) bool {
 	for _, op := range ops {
+		if policy.FlowAllowed(cap, op) != nil {
+			continue
+		}
 		switch {
 		case op.RequiresCapability == "":
 			return true
@@ -484,6 +490,9 @@ func (a *Adapter) transform(name string, t catalog.Tool, cap auth.ConnectorCapab
 
 // Prepare applies request hooks before final argument policy and the intent receipt.
 func (a *Adapter) Prepare(ctx context.Context, call adapter.Call) (adapter.Call, error) {
+	if a.spec.OwnerOnly && (call.Grant == nil || !call.Grant.Capabilities.IsOwner()) {
+		return call, adapter.Denied("connector is owner-only")
+	}
 	if !a.spec.Tools.Allows(call.Tool) {
 		return call, &adapter.UpstreamError{Code: "BROKER_TOOL_NOT_EXPOSED", Message: call.Tool + " is excluded by the connector's tools filter"}
 	}
@@ -506,6 +515,9 @@ func (a *Adapter) Prepare(ctx context.Context, call adapter.Call) (adapter.Call,
 
 // Execute forwards the prepared and authorised call, then applies response policy and shaping.
 func (a *Adapter) Execute(ctx context.Context, call adapter.Call) (*adapter.Result, error) {
+	if a.spec.OwnerOnly && (call.Grant == nil || !call.Grant.Capabilities.IsOwner()) {
+		return nil, adapter.Denied("connector is owner-only")
+	}
 	a.touch()
 	defer a.untouch()
 	if !a.spec.Tools.Allows(call.Tool) {
@@ -538,6 +550,10 @@ func (a *Adapter) Execute(ctx context.Context, call adapter.Call) (*adapter.Resu
 			return nil, &adapter.UpstreamError{Code: adapter.CodeUpstreamError, Message: a.spec.Name + " call timed out", Outcome: adapter.OutcomeUnknown}
 		}
 		a.dropSession()
+		if call.Op.Flow != nil {
+			return nil, &adapter.UpstreamError{Code: adapter.CodeUpstreamUnavailable,
+				Message: "flow connection failed after dispatch; reconcile before retry", Outcome: adapter.OutcomeUnknown}
+		}
 		return nil, adapter.Unavailable(a.spec.Name + " call failed: " + adapter.Truncate(err.Error(), 200))
 	}
 	if a.spec.Response.AppliesTo(call.Tool) {
@@ -557,6 +573,11 @@ func (a *Adapter) Execute(ctx context.Context, call adapter.Call) (*adapter.Resu
 		return &adapter.Result{Raw: res, Outcome: adapter.OutcomeCompleted, OutcomeClass: outcome, Account: accountOf(args)}, nil
 	}
 	payload := payloadOf(res)
+	if call.Op.Flow != nil {
+		if err := validateFlowResult(call, payload); err != nil {
+			return nil, err
+		}
+	}
 	if res.IsError {
 		msg, _ := json.Marshal(payload)
 		return nil, adapter.Failed(string(msg))
@@ -570,9 +591,13 @@ func (a *Adapter) Execute(ctx context.Context, call adapter.Call) (*adapter.Resu
 	if err := policy.CheckResultRows(payload, call.Decision.Limits); err != nil {
 		return nil, adapter.Denied(err.Error())
 	}
+	requestID := upstreamID(payload)
+	if call.Op.Flow != nil {
+		requestID = payload.(map[string]any)["n8n_execution_id"].(string)
+	}
 	return &adapter.Result{
 		Compact: shape(payload, call.Op), Verbose: payload, Outcome: adapter.OutcomeCompleted, OutcomeClass: "ok",
-		Account: accountOf(args), UpstreamRequestID: upstreamID(payload),
+		Account: accountOf(args), UpstreamRequestID: requestID,
 	}, nil
 }
 

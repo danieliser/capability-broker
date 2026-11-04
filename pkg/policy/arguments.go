@@ -53,6 +53,9 @@ func EvaluateArguments(ctx context.Context, g *auth.Grant, connector string, op 
 	}
 	d.Args = CloneArgs(d.Args)
 	d.Limits = CloneArgs(d.Limits)
+	if dd := checkFlow(g, cap, op, &d); dd != nil {
+		return *dd, nil
+	}
 	var daily *int64
 	for _, r := range op.ArgumentConstraints {
 		if err := r.Validate(); err != nil {

@@ -1,0 +1,9 @@
+# Merge this entry under connectors in ~/.brokerd/connectors.yaml; do not replace other entries.
+connectors:
+  n8n:
+    url: http://127.0.0.1:5678/mcp-server/http
+    headers:
+      Authorization: "Bearer ${secret:N8N_MCP_TOKEN}"
+    owner_only: true
+    expose: passthrough
+    clients: [claude-code, codex]

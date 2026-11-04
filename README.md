@@ -52,6 +52,8 @@ From a clone with Go installed, `./install.sh` builds from source instead. `--no
 (containers, CI, other init systems; then run `brokerd` yourself). On Linux, `loginctl enable-linger $USER` keeps
 it running after you log out. Settings: `BIN_DIR`, `BROKERD_DATA_DIR`, `BROKERD_PORT`, `BROKERD_VERSION`.
 
+For owner n8n instance MCP and scoped agent workflow tools, see the [n8n setup and grant contract](docs/n8n.md).
+
 Keys go in `~/.brokerd/secrets.json` (0600) with `brokerd secret set NAME` (the value is read from stdin) and are
 referenced as `${secret:NAME}`. Servers go in `~/.brokerd/connectors.yaml`, which starts empty with commented
 examples.

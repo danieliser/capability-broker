@@ -4,6 +4,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+- Add an owner `n8n` Streamable HTTP recipe using the broker secret store, original tool names/results and an empty agent catalog. Enforce `owner_only` at discovery and dispatch as well as grant minting.
+- Add deny-by-default `n8n-flows` workflow-tool catalogs: reviewed logical IDs/deployments, `flows.run`, per-grant allowlists, separate write/send/spend capabilities, required daily budgets, grant-derived run correlation and execution receipts. Ambiguous flow responses/connections remain `outcome_unknown`. Includes fixture HTTP coverage and the Apex installation/rollback runbook; no live installation or restart.
+
 ## [0.12.0] - 2026-11-03
 
 - Preserve denied inherited prefixes, require byte-exact smoke-cleanup tags, and keep owner tool arguments free of agent guards and limits, including exposed actions outside the agent operation map.

@@ -1,0 +1,5 @@
+# Instance MCP is owner-only. No discovered tool becomes an agent operation.
+connector: n8n
+version: 1
+adapter_version: "1.0"
+operations: []

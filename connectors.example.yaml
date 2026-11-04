@@ -47,6 +47,17 @@ connectors: {}
 #     url: https://mcp.vercel.com/
 #     oauth: {}
 #
+#   # n8n instance management: Streamable HTTP, owner tools/results unchanged.
+#   # Import Keychain n8n-mcp-token via `brokerd secret set N8N_MCP_TOKEN` (stdin).
+#   # Agent workflow tools use a separate n8n-flows connector/catalog: docs/n8n.md.
+#   n8n:
+#     url: http://127.0.0.1:5678/mcp-server/http
+#     headers:
+#       Authorization: "Bearer ${secret:N8N_MCP_TOKEN}"
+#     owner_only: true
+#     expose: passthrough
+#     clients: [claude-code, codex]
+#
 #   # Personal data: your own apps only, never granted to agents.
 #   gmail-work:
 #     command: gog

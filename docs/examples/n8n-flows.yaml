@@ -1,0 +1,18 @@
+# TEMPLATE: replace tool name and all deployment metadata from a reviewed fixture deployment.
+# Install as ~/.brokerd/catalog.d/n8n-flows.yaml before enabling the connector.
+connector: n8n-flows
+version: 1
+adapter_version: "1.0"
+operations:
+  - id: flows.run
+    tool: fixture_echo
+    risk: read
+    requires_capability: operations:flows.run
+    argument_constraints:
+      - {kind: max_per_day, key: max_per_day, default: 0}
+    flow:
+      id: fixture.echo
+      effect_class: read
+      git_revision: 0123456789abcdef0123456789abcdef01234567
+      workflow_id: REPLACE_FROM_DEPLOYMENT
+      workflow_version: REPLACE_FROM_DEPLOYMENT
