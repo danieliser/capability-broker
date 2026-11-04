@@ -49,6 +49,13 @@ CREATE TABLE IF NOT EXISTS daily_counters (
   PRIMARY KEY (scope, operation, day)
 );
 
+CREATE TABLE IF NOT EXISTS flow_run_keys (
+  scope TEXT NOT NULL,
+  key_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (scope, key_hash)
+);
+
 CREATE TABLE IF NOT EXISTS receipts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   ts TEXT NOT NULL,

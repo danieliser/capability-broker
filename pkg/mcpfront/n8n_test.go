@@ -31,6 +31,7 @@ type n8nFixture struct {
 	calls         []map[string]any
 	omitExecution bool
 	rpcError      bool
+	isError       bool
 }
 
 func (f *n8nFixture) count() int { f.mu.Lock(); defer f.mu.Unlock(); return len(f.calls) }
@@ -54,7 +55,7 @@ func n8nHarness(t *testing.T) (*harness, *n8nFixture, *connectors.Spec, string) 
 	h.front.Catalog = cat
 	f := &n8nFixture{}
 	srv := mcp.NewServer(&mcp.Implementation{Name: "n8n-fixture", Version: "1"}, &mcp.ServerOptions{Instructions: "Original n8n fixture instructions."})
-	for _, name := range []string{"create_workflow", "update_workflow", "delete_workflow", "fixture_read", "fixture_write", "fixture_send", "fixture_spend"} {
+	for _, name := range []string{"create_workflow", "update_workflow", "delete_workflow", "execute_workflow", "renamed_management", "fixture_read", "fixture_write", "fixture_send", "fixture_spend"} {
 		tool := &mcp.Tool{Name: name, Title: "Original " + name, Description: "Fixture " + name, Meta: mcp.Meta{"fixture": "original"},
 			Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true}, InputSchema: json.RawMessage(`{"type":"object","additionalProperties":true}`)}
 		srv.AddTool(tool, func(_ context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -66,6 +67,7 @@ func n8nHarness(t *testing.T) (*harness, *n8nFixture, *connectors.Spec, string) 
 			f.calls = append(f.calls, args)
 			omit := f.omitExecution
 			rpcError := f.rpcError
+			isError := f.isError
 			f.mu.Unlock()
 			if rpcError {
 				return nil, fmt.Errorf("fixture dispatch response lost")
@@ -80,7 +82,7 @@ func n8nHarness(t *testing.T) (*harness, *n8nFixture, *connectors.Spec, string) 
 				}
 			}
 			raw, _ := json.Marshal(payload)
-			return &mcp.CallToolResult{Meta: mcp.Meta{"original": "result"}, Content: []mcp.Content{&mcp.TextContent{Text: string(raw)}, &mcp.TextContent{Text: "original second block"}}, StructuredContent: payload, IsError: req.Params.Name == "update_workflow"}, nil
+			return &mcp.CallToolResult{Meta: mcp.Meta{"original": "result"}, Content: []mcp.Content{&mcp.TextContent{Text: string(raw)}, &mcp.TextContent{Text: "original second block"}}, StructuredContent: payload, IsError: req.Params.Name == "update_workflow" || isError}, nil
 		})
 	}
 	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return srv }, &mcp.StreamableHTTPOptions{Stateless: true})
@@ -381,5 +383,123 @@ func TestN8nFlowBudgetsAllowlistAndUnknown(t *testing.T) {
 	// Inputs and inherited authority are not mutated by execution.
 	if !reflect.DeepEqual(caps["n8n-flows"].Operations, []string{"flows.run", "flows.write", "flows.send", "flows.spend"}) {
 		t.Fatal("grant mutated")
+	}
+}
+
+func TestN8nEffectReplayDeniedAfterUnknown(t *testing.T) {
+	h, f, _, _ := n8nHarness(t)
+	f.mu.Lock()
+	f.omitExecution = true
+	f.mu.Unlock()
+	caps := flowCaps("flows.run", "flows.send")
+	s := h.connect(t, flowToken(t, h, caps, "first-run"), "n8n-flows")
+	args := map[string]any{"idempotency_key": "one-effect"}
+	res := callFixture(t, s, "fixture_send", args)
+	if !res.IsError || !strings.Contains(text(res), "reconcile") || f.count() != 1 {
+		t.Fatalf("first dispatch: %s calls=%d", text(res), f.count())
+	}
+	// Another grant/run must not redispatch an effect whose outcome is unknown.
+	s2 := h.connect(t, flowToken(t, h, caps, "retry-run"), "n8n-flows")
+	res = callFixture(t, s2, "fixture_send", args)
+	if !res.IsError || !strings.Contains(text(res), "BROKER_DUPLICATE_FLOW_RUN") || f.count() != 1 {
+		t.Fatalf("effect replayed: %s calls=%d", text(res), f.count())
+	}
+}
+
+func TestN8nEffectReplayConcurrentAndOwnerTransparent(t *testing.T) {
+	h, f, _, _ := n8nHarness(t)
+	caps := flowCaps("flows.run", "flows.send")
+	tok := flowToken(t, h, caps, "concurrent-run")
+	g, err := h.store.Authenticate(context.Background(), tok, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.WithValue(context.Background(), grantKey, g)
+	var wg sync.WaitGroup
+	for range 10 {
+		wg.Go(func() {
+			res, err := h.front.call(ctx, "n8n-flows", "fixture_send", &mcp.CallToolRequest{Params: &mcp.CallToolParamsRaw{Arguments: json.RawMessage(`{"idempotency_key":"concurrent-effect"}`)}})
+			if err != nil || (res.IsError && !strings.Contains(text(res), "BROKER_DUPLICATE_FLOW_RUN")) {
+				t.Errorf("concurrent dispatch: %v %v", res, err)
+			}
+		})
+	}
+	wg.Wait()
+	if f.count() != 1 {
+		t.Fatalf("concurrent key dispatched %d times", f.count())
+	}
+	// Owner flow calls may repeat keys and retain their original arguments.
+	_, ownerToken, err := h.store.Mint(ctx, auth.MintRequest{Kind: auth.KindClient, Name: "codex", Capabilities: auth.OwnerCapabilities()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := h.connect(t, ownerToken, "n8n-flows")
+	args := map[string]any{"idempotency_key": "concurrent-effect", "verbose": true}
+	for range 2 {
+		if res := callFixture(t, s, "fixture_send", args); res.IsError {
+			t.Fatal(text(res))
+		}
+	}
+	if f.count() != 3 {
+		t.Fatal("owner replay path changed")
+	}
+	f.mu.Lock()
+	last := f.calls[len(f.calls)-1]
+	f.mu.Unlock()
+	sameJSON(t, args, last)
+}
+
+func TestN8nReviewManagementPaths(t *testing.T) {
+	h, f, spec, _ := n8nHarness(t)
+	caps := flowCaps("flows.run", "create_workflow", "update_workflow", "delete_workflow", "execute_workflow", "renamed_management")
+	// Model an old grant naming the instance, even though admin minting refuses it.
+	caps["n8n"] = caps["n8n-flows"]
+	tok := flowToken(t, h, caps, "review-paths")
+	g, err := h.store.Authenticate(context.Background(), tok, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.WithValue(context.Background(), grantKey, g)
+	for _, flag := range []bool{true, false} {
+		spec.OwnerOnly = flag
+		for _, connector := range []string{"n8n", "n8n-flows"} {
+			for _, tool := range []string{"create_workflow", "update_workflow", "delete_workflow", "execute_workflow", "renamed_management", "never_discovered"} {
+				req := &mcp.CallToolRequest{Params: &mcp.CallToolParamsRaw{Arguments: json.RawMessage(`{}`)}}
+				res, err := h.front.call(ctx, connector, tool, req)
+				if err != nil || !res.IsError {
+					t.Fatalf("dispatch admitted %s/%s: %v %v", connector, tool, res, err)
+				}
+				// Bypass discovery's normal owner-only registration as well.
+				raw, _ := json.Marshal(discArgs{Connector: connector, Tool: tool, Arguments: json.RawMessage(`{}`)})
+				req.Params.Arguments = raw
+				res, err = h.front.discover(ctx, "call_tool", map[string]bool{connector: true}, req)
+				if err != nil || !res.IsError {
+					t.Fatalf("discovery admitted %s/%s: %v %v", connector, tool, res, err)
+				}
+			}
+		}
+	}
+	spec.OwnerOnly = true
+	for _, suffix := range []string{"", "?prefix=none", "?ondemand=all"} {
+		s, err := mcp.NewClient(&mcp.Implementation{Name: "review", Version: "1"}, nil).Connect(ctx,
+			&mcp.StreamableClientTransport{Endpoint: h.srv.URL + "/mcp" + suffix, DisableStandaloneSSE: true,
+				HTTPClient: &http.Client{Transport: &bearerRT{token: tok, next: http.DefaultTransport}}}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		listed, err := s.ListTools(ctx, nil)
+		if err != nil || len(listed.Tools) != 1 || !strings.HasSuffix(listed.Tools[0].Name, "fixture_read") {
+			t.Fatalf("aggregate tools: %v %v", listed, err)
+		}
+		for _, tool := range []string{"n8n__execute_workflow", "n8n-flows__renamed_management", "renamed_management", "call_tool"} {
+			res, err := s.CallTool(ctx, &mcp.CallToolParams{Name: tool, Arguments: map[string]any{"connector": "n8n", "tool": "execute_workflow"}})
+			if err == nil && !res.IsError {
+				t.Fatalf("aggregate admitted %s", tool)
+			}
+		}
+		s.Close()
+	}
+	if f.count() != 0 {
+		t.Fatalf("management denials reached upstream %d times", f.count())
 	}
 }

@@ -158,9 +158,15 @@ from the grant/catalog even if the caller supplies conflicting values. Bind
 artifact in the catalog; full 40- or 64-digit git hashes are required.
 
 An effectful flow needs a non-empty top-level `idempotency_key`. Map it to the
-manifest's key path and enforce deduplication at the effect boundary. The broker
-records the key but does **not** guarantee exactly-once execution or implement
-workflow-side deduplication. Keep user input away from dynamic destinations,
+manifest's key path and enforce deduplication at the effect boundary. Before
+dispatch, the broker atomically reserves the key for the project/logical flow.
+The same key is denied with `BROKER_DUPLICATE_FLOW_RUN` across agents, grants,
+runs, tool renames, revisions, days and broker restarts. Reservations survive
+unknown outcomes and failed intent writes; reconcile the original run before
+choosing any new key. Duplicate attempts may consume daily quota. The broker
+does **not** guarantee exactly-once execution or implement workflow-side
+deduplication. Owner calls remain transparent and bypass this agent guard.
+Keep user input away from dynamic destinations,
 workflow selection, credentials and expression/code execution.
 
 Return a JSON object (MCP structuredContent or a single JSON text block):
@@ -225,5 +231,8 @@ Disable the two connectors (or remove only their entries) and let config
 hot-reload; revoke fixture grants. Remove the flow catalog and unused broker
 secret keys only after connector removal. Restore prior client entries with
 `brokerd client restore n8n` when an adopted entry existed. Do not use a global
-client revert that would affect unrelated servers. No database migration is
-needed. Keep existing receipts and daily counters during rollback.
+client revert that would affect unrelated servers. Startup adds only the
+`flow_run_keys` table (scope, hashed key, timestamp); it does not rewrite existing
+rows. Keep that table, existing receipts and daily counters during rollback.
+An older binary ignores the table; re-enabling effects on it loses broker replay
+protection, so keep the agent flow connector disabled until the fix is restored.

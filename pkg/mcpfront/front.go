@@ -685,6 +685,24 @@ func (f *Front) call(ctx context.Context, connector, tool string, req *mcp.CallT
 		return toolError(decision.Code, decision.Reason), nil
 	}
 	base.Args = decision.Args
+	if op.Flow != nil && op.Flow.EffectClass != "read" && !g.Capabilities.IsOwner() {
+		// A logical effect key belongs to the project/flow, not a particular
+		// agent, grant, run, tool name or deployment revision. Retrying after
+		// ambiguous dispatch must not execute the effect again.
+		scope, _ := json.Marshal([]string{connector, g.ProjectKey, op.Flow.ID})
+		key, _ := decision.Args["idempotency_key"].(string)
+		admitted, err := f.Store.ReserveFlowRun(ctx, string(scope), key)
+		if err != nil {
+			f.Audit.Denied(ctx, base, "BROKER_INTERNAL", "flow replay guard unavailable")
+			return toolError("BROKER_INTERNAL", "flow replay guard unavailable"), nil
+		}
+		if !admitted {
+			const code = "BROKER_DUPLICATE_FLOW_RUN"
+			const msg = "flow idempotency key already admitted; reconcile the original run before any new effect"
+			f.Audit.Denied(ctx, base, code, msg)
+			return toolError(code, msg), nil
+		}
+	}
 
 	callID, err := f.Audit.Intent(ctx, base)
 	if err != nil {
