@@ -4,6 +4,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions are sem
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-04
+
 - Prevent agent effectful flow replays with durable, atomic project/flow idempotency reservations, including retries after unknown outcomes and across grants or broker restarts. Owner calls bypass the replay guard.
 - Treat effectful workflow error results as `outcome_unknown`: a later node failure cannot prove that earlier effects did not happen. Owner error results remain verbatim.
 
